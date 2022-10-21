@@ -1,0 +1,8 @@
+wemos 1 mac-main = 68:C6:3A:A4:C9:60
+wemos 2 mac = AC:0B:FB:DC:91:79
+wemos 3 mac = AC:0B:FB:D9:95:58
+wemos 4 mac =
+wemos 5 mac = 
+uint8_t broadcastAddress[] = {0xAC, 0x0B, 0xFB, 0xDC, 0x91, 0x79};
+https://demo-dijiudu.readthedocs.io/en/latest/api-reference/wifi/esp_now.html
+https://www.espressif.com/sites/default/files/documentation/2c-esp8266_non_os_sdk_api_reference_en.pdf

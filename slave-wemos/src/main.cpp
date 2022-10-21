@@ -2,6 +2,7 @@
 #include <ESP8266WiFi.h>
 #include <espnow.h>
 
+const char LED = D5;
 // Structure example to receive data
 // Must match the sender structure
 typedef struct struct_message {
@@ -12,10 +13,11 @@ typedef struct struct_message {
     bool e;
 } struct_message;
 
+int zprava = 0;
 // Create a struct_message called myData
 struct_message myData;
 
-// Callback function that will be executed when data is received
+// callback function that will be executed when data is received
 void OnDataRecv(uint8_t * mac, uint8_t *incomingData, uint8_t len) {
   memcpy(&myData, incomingData, sizeof(myData));
   Serial.print("Bytes received: ");
@@ -31,10 +33,12 @@ void OnDataRecv(uint8_t * mac, uint8_t *incomingData, uint8_t len) {
   Serial.print("Bool: ");
   Serial.println(myData.e);
   Serial.println();
+  zprava++;
 }
  
 void setup() {
   // Initialize Serial Monitor
+  pinMode(LED, OUTPUT);
   Serial.begin(115200);
   
   // Set device as a Wi-Fi Station
@@ -52,6 +56,10 @@ void setup() {
   esp_now_register_recv_cb(OnDataRecv);
 }
 
-void loop() {
-  
+void loop(){
+  if((zprava%2) == HIGH){
+    digitalWrite(LED, HIGH);
+  }else{
+    digitalWrite(LED, LOW);
+  }
 }

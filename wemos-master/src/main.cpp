@@ -2,8 +2,10 @@
 #include <ESP8266WiFi.h>
 #include <espnow.h>
 
+const char button = D2;
 // REPLACE WITH RECEIVER MAC Address
-uint8_t broadcastAddress[] = {0xAC, 0x0B, 0xFB, 0xDC, 0x91, 0x79};
+
+uint8_t broadcastAddress[] = {0x68, 0xC6, 0x3A, 0xA4, 0xC9, 0x60};
 
 // Structure example to send data
 // Must match the receiver structure
@@ -18,8 +20,6 @@ typedef struct struct_message {
 // Create a struct_message called myData
 struct_message myData;
 
-unsigned long lastTime = 0;  
-unsigned long timerDelay = 2000;  // send readings timer
 
 // Callback when data is sent
 void OnDataSent(uint8_t *mac_addr, uint8_t sendStatus) {
@@ -33,6 +33,7 @@ void OnDataSent(uint8_t *mac_addr, uint8_t sendStatus) {
 }
  
 void setup() {
+  pinMode(button,INPUT_PULLUP); //button
   // Init Serial Monitor
   Serial.begin(115200);
  
@@ -53,19 +54,19 @@ void setup() {
   // Register peer
   esp_now_add_peer(broadcastAddress, ESP_NOW_ROLE_SLAVE, 1, NULL, 0);
 }
- 
+
 void loop() {
-  if ((millis() - lastTime) > timerDelay) {
+  if(digitalRead(button)==HIGH){
     // Set values to send
     strcpy(myData.a, "THIS IS A CHAR");
-    myData.b = random(1,20);
+    myData.b = 1;
     myData.c = 1.2;
     myData.d = "Hello";
     myData.e = false;
 
     // Send message via ESP-NOW
     esp_now_send(broadcastAddress, (uint8_t *) &myData, sizeof(myData));
-
-    lastTime = millis();
+    delay(500);
   }
+ 
 }
