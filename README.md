@@ -19,7 +19,8 @@ V závěrečné práci se budu zabývat tvorbou chytrých tlačítek. Projekt js
 ### Technologie:
 - Wemos D1 mini
 - JavaScript, Node.js, C++
-- Arduino IDE
+- Espressif
+- Arduino IDE, PlatoformIO
 - Autodesk Inventor
 
 ### Časový harmonogram:
@@ -38,3 +39,5 @@ V závěrečné práci se budu zabývat tvorbou chytrých tlačítek. Projekt js
 - Sepsání dokumentace
 
 ### Zdroje:
+- https://demo-dijiudu.readthedocs.io/en/latest/api-reference/wifi/esp_now.html     Seznam příkazů/dokumentace
+- https://www.espressif.com/sites/default/files/documentation/2c-esp8266_non_os_sdk_api_reference_en.pdf      Dokumentace
