@@ -2,7 +2,9 @@
 #include <ESP8266WiFi.h>
 #include <espnow.h>
 
+uint8_t broadcastAddress[] = {0xAC, 0x0B, 0xFB, 0xDC, 0x91, 0x79};
 const char LED = D5;
+const char button = D1;
 // Structure example to receive data
 // Must match the sender structure
 typedef struct struct_message {
@@ -13,9 +15,15 @@ typedef struct struct_message {
     bool e;
 } struct_message;
 
-int zprava = 0;
+typedef struct struct_answer{
+  int ledS;
+}struct_answer;
+
+int LEDSTATE = 0;
 // Create a struct_message called myData
 struct_message myData;
+struct_answer ledData;
+String success;
 
 // callback function that will be executed when data is received
 void OnDataRecv(uint8_t * mac, uint8_t *incomingData, uint8_t len) {
@@ -33,11 +41,22 @@ void OnDataRecv(uint8_t * mac, uint8_t *incomingData, uint8_t len) {
   Serial.print("Bool: ");
   Serial.println(myData.e);
   Serial.println();
-  zprava++;
+  LEDSTATE = myData.b;
+  digitalWrite(LED, HIGH);
 }
  
+void OnDataSent(uint8_t *mac_addr, uint8_t sendStatus) {
+  Serial.print("Last Packet Send Status: ");
+  if (sendStatus == 0){
+    Serial.println("Delivery success");
+  }else {
+  success = "Delivery Fail :(";
+  }
+}
+
 void setup() {
   // Initialize Serial Monitor
+  pinMode(button,INPUT_PULLUP);
   pinMode(LED, OUTPUT);
   Serial.begin(115200);
   
@@ -52,14 +71,18 @@ void setup() {
   
   // Once ESPNow is successfully Init, we will register for recv CB to
   // get recv packer info
-  esp_now_set_self_role(ESP_NOW_ROLE_SLAVE);
+  esp_now_set_self_role(ESP_NOW_ROLE_COMBO);
   esp_now_register_recv_cb(OnDataRecv);
+  esp_now_register_send_cb(OnDataSent);
+  esp_now_add_peer(broadcastAddress, ESP_NOW_ROLE_COMBO, 1, NULL, 0);
 }
 
 void loop(){
-  if((zprava%2) == HIGH){
-    digitalWrite(LED, HIGH);
-  }else{
+  if(digitalRead(button)==HIGH && LEDSTATE==1){
+    ledData.ledS = 0;
+    esp_now_send(broadcastAddress, (uint8_t *) &ledData, sizeof(ledData));
     digitalWrite(LED, LOW);
+    LEDSTATE=0;
+    delay(500);
   }
 }
