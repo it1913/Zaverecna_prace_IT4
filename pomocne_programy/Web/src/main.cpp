@@ -3,8 +3,8 @@
 #include <ESPAsyncWebServer.h>
 
 
-const char* ssid = "Lego3"; //Write your SSID
-const char* password = "AdelaMartinPetraIvo";   //Write your password
+const char* ssid = "";
+const char* password = "";
 
 const char* input_parameter = "state";
 
