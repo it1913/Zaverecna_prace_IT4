@@ -2,22 +2,29 @@
 #include <ESPAsyncTCP.h>
 #include <ESPAsyncWebServer.h>
 
+const int button_count = 4;
 
-const char* ssid = "";
-const char* password = "";
+struct Button
+{
+  int button_pin;
+  int button_state;
+  int LED_pin;
+  int LED_state;
+  int last_button_state;
+};
 
-const char* input_parameter = "state";
+Button button[button_count] = {
+    {5, LOW, 2, HIGH, LOW},
+    {5, LOW, 2, HIGH, LOW},
+    {D2, LOW, D6, HIGH, LOW},
+    {D2, LOW, D6, HIGH, LOW},
+};
 
-const int output = 2;
-const int Push_button_GPIO = 5;
+const char *ssid = "Lego3";
+const char *password = "AdelaMartinPetraIvo";
 
-// Variables will change:
-int LED_state = LOW;         
-int button_state;             
-int lastbutton_state = LOW;   
-
-unsigned long lastDebounceTime = 0;  
-unsigned long debounceDelay = 50;    
+unsigned long lastDebounceTime = 0;
+unsigned long debounceDelay = 50;
 
 AsyncWebServer server(80);
 
@@ -27,10 +34,10 @@ const char index_html[] PROGMEM = R"rawliteral(
   <title>ESP Output Control Web Server</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <style>
-    html {font-family: Times New Roman; display: inline-block; text-align: center;}
-    h2 {font-size: 3.0rem;}
-    h4 {font-size: 2.0rem;}
-    p {font-size: 3.0rem;}
+    html {font-family: Segoe UI; display: inline-block; text-align: center;}
+    h2 {font-size: 1.5rem;}
+    h4 {font-size: 1.0rem;}
+    p {font-size: 1.0rem;}
     body {max-width: 900px; margin:0px auto; padding-bottom: 25px;}
     .switch {position: relative; display: inline-block; width: 120px; height: 68px} 
     .switch input {display: none}
@@ -49,128 +56,146 @@ const char index_html[] PROGMEM = R"rawliteral(
   else { xhr.open("GET", "/update?state=0", true); }
   xhr.send();
 }
-
+const Milliseconds = 100; //interval pro aktualizaci stavu diod
 setInterval(function ( ) {
   var xhttp = new XMLHttpRequest();
   xhttp.onreadystatechange = function() {
     if (this.readyState == 4 && this.status == 200) {
-      var inputChecked;
-      var outputStateM;
-      if( this.responseText == 1){ 
-        inputChecked = true;
-        outputStateM = "ON";
-      }
-      else { 
-        inputChecked = false;
-        outputStateM = "OFF";
-      }
-      document.getElementById("output").checked = inputChecked;
-      document.getElementById("outputState").innerHTML = outputStateM;
+      const state = this.responseText.split(',').map(Number);
+      const elements = document.querySelectorAll('input');      
+      elements.forEach((el, index) => { 
+        el.checked = state[index]; 
+        document.getElementById("outputState"+index).innerHTML = (state[index] ? "ON" : "OFF" );
+      });
     }
   };
   xhttp.open("GET", "/state", true);
   xhttp.send();
-}, 1000 ) ;
+}, Milliseconds ) ;
 </script>
 </body>
 </html>
 )rawliteral";
 
-String outputState(){
-  if(digitalRead(output)){
+String outputState(int output)
+{
+  if (digitalRead(output))
+  {
     return "checked";
   }
-  else {
+  else
+  {
     return "";
   }
   return "";
 }
 
-String processor(const String& var){
-  if(var == "BUTTONPLACEHOLDER"){
-    String buttons ="";
-    String outputStateValue = outputState();
-    buttons+= "<h4>Output State: <span id=\"outputState\"></span></h4><label class=\"switch\"><input type=\"checkbox\" onchange=\"toggleCheckbox(this)\" id=\"output\" " + outputStateValue + "><span class=\"slider\"></span></label>";
+String processor(const String &var)
+{
+  if (var == "BUTTONPLACEHOLDER")
+  {
+    String buttons = "";
+    for (int i = 0; i < button_count; i++)
+    {
+      String outputStateValue = outputState(i);
+      String id_outputState = "outputState" + String(i);
+      String id_output = "output" + String(i);
+      buttons += "<h4>Output State LED #" + String(i) + ": <span id=\"" + id_outputState + "\"></span></h4><label class=\"switch\"><input type=\"checkbox\" onchange=\"toggleCheckbox(this)\" id=\"" + id_output + "\" " + outputStateValue + "><span class=\"slider\"></span></label>";
+    }
     return buttons;
   }
   return String();
 }
 
-
-
-void setup(){
+void setup()
+{
   // Serial port for debugging purposes
   Serial.begin(115200);
 
-  pinMode(output, OUTPUT);
-  digitalWrite(output, LOW);
-  pinMode(Push_button_GPIO, INPUT);
-  
+  for (int i = 0; i < button_count; i++)
+  {
+    pinMode(button[i].LED_pin, OUTPUT);
+    digitalWrite(button[i].LED_pin, LOW);
+    pinMode(button[i].button_pin, INPUT);
+  }
+
   // Connect to Wi-Fi
   WiFi.begin(ssid, password);
-  while (WiFi.status() != WL_CONNECTED) {
+  while (WiFi.status() != WL_CONNECTED)
+  {
     delay(1000);
     Serial.println("Connecting to WiFi..");
   }
 
-
   Serial.println("IP Address: ");
   Serial.println(WiFi.localIP());
 
+  server.on("/", HTTP_GET, [](AsyncWebServerRequest *request)
+            { request->send_P(200, "text/html", index_html, processor); });
 
-  server.on("/", HTTP_GET, [](AsyncWebServerRequest *request){
-    request->send_P(200, "text/html", index_html, processor);
-  });
-
-  
-  server.on("/update", HTTP_GET, [] (AsyncWebServerRequest *request) {
+  server.on("/update", HTTP_GET, [](AsyncWebServerRequest *request)
+            {
     String input_message;
     String inputParameter;
-    // GET input1 value on <ESP_IP>/update?state=<input_message>
-    if (request->hasParam(input_parameter)) {
-      input_message = request->getParam(input_parameter)->value();
-      inputParameter = input_parameter;
-      digitalWrite(output, input_message.toInt());
-      LED_state = !LED_state;
-    }
-    else {
-      input_message = "No message sent";
-      inputParameter = "none";
+
+    for (int i=0; i< button_count;  i++) {
+      // GET input1 value on <ESP_IP>/update?state=<input_message>
+      String input_parameter = "state";
+      if (request->hasParam(input_parameter))
+      {
+        input_message = request->getParam(input_parameter)->value();
+        inputParameter = input_parameter;
+        button[i].LED_state = input_message.toInt();
+        digitalWrite(button[i].LED_pin, button[i].LED_state);
+      }
+      else
+      {
+        input_message = "No message sent";
+        inputParameter = "none";
+      }
     }
     Serial.println(input_message);
-    request->send(200, "text/plain", "OK");
-  });
+    request->send(200, "text/plain", "OK"); });
 
-  
-  server.on("/state", HTTP_GET, [] (AsyncWebServerRequest *request) {
-    request->send(200, "text/plain", String(digitalRead(output)).c_str());
-  });
+  server.on("/state", HTTP_GET, [](AsyncWebServerRequest *request)
+    {
+      String message = "";
+      for (int i=0; i< button_count;  i++) {
+        message += String(digitalRead(button[i].LED_pin)) + ",";
+      } 
+      request->send(200, "text/plain", message.c_str());
+    });
   // Start server
   server.begin();
 }
-  
-void loop() {
-  int data = digitalRead(Push_button_GPIO);
 
-  if (data != lastbutton_state) {
-    // reset the debouncing timer
-    lastDebounceTime = millis();
-  }
+void loop()
+{
+  for (int i = 0; i < button_count; i++)
+  {
+    int button_state = digitalRead(button[i].button_pin);
 
-  if ((millis() - lastDebounceTime) > debounceDelay) {
-    if (data != button_state) {
-      button_state = data;
+    if (button_state != button[i].last_button_state)
+    {
+      // reset the debouncing timer
+      lastDebounceTime = millis();
+    }
 
+    if ((millis() - lastDebounceTime) > debounceDelay)
+    {
+      if (button_state != button[i].button_state)
+      {
+        button[i].button_state = button_state;
 
-      if (button_state == HIGH) {
-        LED_state = !LED_state;
+        if (button[i].button_state == HIGH)
+        {
+          button[i].LED_state = !button[i].LED_state;
+        }
       }
     }
+
+    digitalWrite(button[i].LED_pin, button[i].LED_state);
+
+    button[i].last_button_state = button_state;
   }
-
-  
-  digitalWrite(output, LED_state);
-
-
-  lastbutton_state = data;
 }
