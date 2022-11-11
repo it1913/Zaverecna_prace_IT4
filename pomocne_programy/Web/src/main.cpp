@@ -50,14 +50,8 @@ const char index_html[] PROGMEM = R"rawliteral(
 <body>
   <h2>ESP Output Control Web Server</h2>
   %BUTTONPLACEHOLDER%
-<script>function toggleCheckbox(element) {
-  var xhr = new XMLHttpRequest();
-  if(element.checked){ xhr.open("GET", "/update?state=1", true); }
-  else { xhr.open("GET", "/update?state=0", true); }
-  xhr.send();
-}
-const Milliseconds = 100; //interval pro aktualizaci stavu diod
-setInterval(function ( ) {
+<script>
+function readState( ) {
   var xhttp = new XMLHttpRequest();
   xhttp.onreadystatechange = function() {
     if (this.readyState == 4 && this.status == 200) {
@@ -70,8 +64,19 @@ setInterval(function ( ) {
     }
   };
   xhttp.open("GET", "/state", true);
-  xhttp.send();
-}, Milliseconds ) ;
+  xhttp.send();  
+}
+
+const Milliseconds = 1000; //interval pro aktualizaci stavu diod
+
+function toggleCheckbox(element) {
+  var xhr = new XMLHttpRequest();
+  if(element.checked){ xhr.open("GET", "/update?state=1&id="+element.id, true); }
+  else { xhr.open("GET", "/update?state=0&id="+element.id, true); }
+  xhr.send();
+  setTimeout( readState(), Milliseconds );  
+}
+setInterval( readState(), Milliseconds ) ;
 </script>
 </body>
 </html>
@@ -135,27 +140,29 @@ void setup()
 
   server.on("/update", HTTP_GET, [](AsyncWebServerRequest *request)
             {
-    String input_message;
-    String inputParameter;
+    String input_state;
+    String input_id;
+    String parameter_state = "state";
+    String parameter_id = "id";
 
-    for (int i=0; i< button_count;  i++) {
-      // GET input1 value on <ESP_IP>/update?state=<input_message>
-      String input_parameter = "state";
-      if (request->hasParam(input_parameter))
+      // GET input1 value on <ESP_IP>/update?state=<input_state>&id=<input_id>
+      if (request->hasParam(parameter_state) && request->hasParam(parameter_id))
       {
-        input_message = request->getParam(input_parameter)->value();
-        inputParameter = input_parameter;
-        button[i].LED_state = input_message.toInt();
-        digitalWrite(button[i].LED_pin, button[i].LED_state);
+        input_state = request->getParam(parameter_state)->value();
+        input_id = request->getParam(parameter_id)->value();
+
+        for (int i=0; i< button_count;  i++) {
+          if ("output"+String(i) == input_id) {
+            button[i].LED_state = input_state.toInt();
+            digitalWrite(button[i].LED_pin, button[i].LED_state);
+
+            Serial.println(input_id + " = " + input_state);
+            request->send(200, "text/plain", "OK");
+
+          }
+        }
       }
-      else
-      {
-        input_message = "No message sent";
-        inputParameter = "none";
-      }
-    }
-    Serial.println(input_message);
-    request->send(200, "text/plain", "OK"); });
+    });
 
   server.on("/state", HTTP_GET, [](AsyncWebServerRequest *request)
     {
