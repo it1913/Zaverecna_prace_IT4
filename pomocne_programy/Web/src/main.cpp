@@ -2,7 +2,7 @@
 #include <ESPAsyncTCP.h>
 #include <ESPAsyncWebServer.h>
 
-const int button_count = 4;
+const int button_count = 2;
 
 struct Button
 {
@@ -14,14 +14,12 @@ struct Button
 };
 
 Button button[button_count] = {
-    {5, LOW, 2, HIGH, LOW},
-    {5, LOW, 2, HIGH, LOW},
-    {D2, LOW, D6, HIGH, LOW},
+    {5, LOW, D3, HIGH, LOW},
     {D2, LOW, D6, HIGH, LOW},
 };
 
-const char *ssid = "Lego3";
-const char *password = "AdelaMartinPetraIvo";
+const char *ssid = "K2_guest";
+const char *password = "";
 
 unsigned long lastDebounceTime = 0;
 unsigned long debounceDelay = 50;
@@ -51,7 +49,7 @@ const char index_html[] PROGMEM = R"rawliteral(
   <h2>ESP Output Control Web Server</h2>
   %BUTTONPLACEHOLDER%
 <script>
-function readState( ) {
+setInterval(function readState( ) {
   var xhttp = new XMLHttpRequest();
   xhttp.onreadystatechange = function() {
     if (this.readyState == 4 && this.status == 200) {
@@ -65,7 +63,7 @@ function readState( ) {
   };
   xhttp.open("GET", "/state", true);
   xhttp.send();  
-}
+},1000);
 
 const Milliseconds = 1000; //interval pro aktualizaci stavu diod
 
@@ -74,9 +72,9 @@ function toggleCheckbox(element) {
   if(element.checked){ xhr.open("GET", "/update?state=1&id="+element.id, true); }
   else { xhr.open("GET", "/update?state=0&id="+element.id, true); }
   xhr.send();
-  setTimeout( readState(), Milliseconds );  
+  readState(); 
 }
-setInterval( readState(), Milliseconds ) ;
+
 </script>
 </body>
 </html>
@@ -156,7 +154,7 @@ void setup()
             button[i].LED_state = input_state.toInt();
             digitalWrite(button[i].LED_pin, button[i].LED_state);
 
-            Serial.println(input_id + " = " + input_state);
+            Serial.println("update button "+input_id + " = " + input_state);
             request->send(200, "text/plain", "OK");
 
           }
@@ -170,6 +168,7 @@ void setup()
       for (int i=0; i< button_count;  i++) {
         message += String(digitalRead(button[i].LED_pin)) + ",";
       } 
+      Serial.println("read state "+ message);
       request->send(200, "text/plain", message.c_str());
     });
   // Start server
@@ -200,9 +199,9 @@ void loop()
         }
       }
     }
-
+    //Serial.println("Button state"+ String(i)+ ":" + String(button[i].last_button_state)+" " + String(button_state)+ " " + String(button[i].LED_state)+ " "+ String(button[i].button_state ));
     digitalWrite(button[i].LED_pin, button[i].LED_state);
-
+    //Serial.println("write "+ String(i) + " = "+String(button[i].LED_state));
     button[i].last_button_state = button_state;
   }
 }
