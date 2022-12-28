@@ -40,6 +40,7 @@ struct Message {
   int id;
   int state;
   int value;
+  int typeOfMessage;
   uint32_t dateTime;
 };
 
@@ -107,6 +108,7 @@ int32_t getWiFiChannel(const char *ssid) {
 void OnDataRecv(uint8_t * mac, uint8_t *incomingData, uint8_t len) {
   memcpy(&recvData, incomingData, sizeof(recvData));
   Begin(self,"recv");
+  if(recvData.typeOfMessage = 1){
   Serial.printf("Received state %d and value=%d from device #%d, ",recvData.state,recvData.value,recvData.id);
   Serial.println(time2str(recvData.dateTime));
   self.state = recvData.state;
@@ -114,6 +116,7 @@ void OnDataRecv(uint8_t * mac, uint8_t *incomingData, uint8_t len) {
   self.waiting = LOW;
   digitalWrite(pin_LED, self.state);
   End(self,"recv"); 
+  }
 }
  
 void OnDataSent(uint8_t *mac_addr, uint8_t sendStatus) {

@@ -4,8 +4,7 @@
 #include <espnow.h>
 
 const int button_count = 3;
-int controlStatus = 0;
-
+int activeButton = 0;
 const char pin_LED = D6;
 const char pin_button = D1;
 
@@ -20,12 +19,13 @@ struct Button
   int id;
   int state;
   DeviceAddress address;
+  int activated;
 };
 
 Button button[button_count] = {
-    {1, LOW, {0x68, 0xC6, 0x3A, 0xA4, 0xC9, 0x60}},
-    {2, LOW, {0xAC, 0x0B, 0xFB, 0xD9, 0x95, 0x58}},
-    {3, LOW, {0xAC, 0x0B, 0xFB, 0xDC, 0x91, 0x79}}
+    {1, LOW, {0x68, 0xC6, 0x3A, 0xA4, 0xC9, 0x60},0},
+    {2, LOW, {0xAC, 0x0B, 0xFB, 0xD9, 0x95, 0x58},0},
+    {3, LOW, {0xAC, 0x0B, 0xFB, 0xDC, 0x91, 0x79},0}
 };
 
 int self_id;
@@ -34,6 +34,7 @@ struct Message {
   int id;
   int state;
   int value;
+  int typeOfMessage;
   uint32_t dateTime;
 };
 
@@ -44,7 +45,7 @@ SendingData sendingData;
 ReceivingData receivingData;
 
 const char *WIFI_SSID = "Lego3";
-const char *password = "AdelaMartinPetraIvo";
+const char *password = "";
 
 AsyncWebServer server(80);
 
@@ -59,10 +60,11 @@ void OnDataSent(uint8_t *mac_addr, uint8_t sendStatus) {
   Serial.print("Last Packet Send Status: ");
   if (sendStatus == 0){
     Serial.println("Delivery success");
-    controlStatus = 1;
+    activeButton = 1;
   }
   else{
     Serial.println("Delivery fail, sendStatus = " + String(sendStatus));
+    activeButton = 0;
   }
 }
 
@@ -73,7 +75,6 @@ void OnDataRecv(uint8_t * mac, uint8_t *incomingData, uint8_t len) {
   int index = receivingData.id-1;
   button[index].state = receivingData.state;
   light(button[index]);
-  controlStatus = receivingData.state;
 }
 
 const char index_html[] PROGMEM = R"rawliteral(
@@ -97,7 +98,10 @@ const char index_html[] PROGMEM = R"rawliteral(
 </head>
 <body>
   <h2>ESP Output Control Web Server</h2>
+  <table>
 %BUTTONPLACEHOLDER%
+<tr><td><button type="button" onclick="whoIsHere()">Kontrola pripojeni</button></td></tr>
+</table>
 <script>
 setInterval(function readState( ) {
   var xhttp = new XMLHttpRequest();
@@ -124,6 +128,22 @@ function toggleCheckbox(element) {
   else { xhr.open("GET", "/update?state=0&id="+element.id, true); }
   xhr.send();
   //readState();
+}
+
+function whoIsHere(element){
+  var xhr = new XMLHttpRequest();
+  xhr.onreadystatechange = function() {
+    if (this.readyState == 4 && this.status == 200) {
+      const state = this.responseText.split(',').map(Number);
+      const elements = document.querySelectorAll('input');      
+      elements.forEach((el, index) => { 
+        el.checked = state[index]; 
+        document.getElementById("outputState"+(index+1)).innerHTML = (state[index] ? "ON" : "OFF" );
+      });
+    }
+  };
+  xhr.open("GET", "/whoIsHere", true);
+  xhr.send();
 }
 
 </script>
@@ -190,8 +210,8 @@ String processor(const String &var)
       String outputStateValue = outputState(button[i]);
       String id_outputState = "outputState" + String(button[i].id);
       String id_output = "output" + String(button[i].id);
-      buttons += "  <h4>Output State LED #" + String(button[i].id) + ": <span id=\"" + id_outputState + "\"></span></h4>\n" +
-                 "  <label class=\"switch\"><input type=\"checkbox\" onchange=\"toggleCheckbox(this)\" id=\"" + id_output + "\" " + outputStateValue + "><span class=\"slider\"></span></label>\n";
+      buttons += "  <tr><td><h4>Output State LED #" + String(button[i].id) + ": <span id=\"" + id_outputState + "\"></span></h4>\n" +
+                 "  <label class=\"switch\"><input type=\"checkbox\" onchange=\"toggleCheckbox(this)\" id=\"" + id_output + "\" " + outputStateValue + "><span class=\"slider\"></span></label></td></tr>";
     }
     return buttons;
   }
@@ -266,6 +286,7 @@ void setup()
             sendingData.id = button[i].id;
             sendingData.value = i;
             sendingData.dateTime = millis();
+            sendingData.typeOfMessage = 1;
             if (button[i].id == self_id) {
               light(button[i]);
             } else {
@@ -276,7 +297,6 @@ void setup()
               esp_now_send(button[i].address.bytes, (uint8_t *) &sendingData, sizeof(sendingData));
               //Serial.println(" after sending button id=" + String(sendingData.id));
             } 
-            controlStatus = input_state.toInt(); 
             //Serial.println("update button "+input_id + " = " + input_state);
             request->send(200, "text/plain", "OK");
           }
@@ -293,6 +313,27 @@ void setup()
       //Serial.println("read state "+ message);
       request->send(200, "text/plain", message.c_str());
     });
+
+  server.on("/whoIsHere", HTTP_GET, [](AsyncWebServerRequest *request)
+  {
+    String message = "";
+    for(int i = 0; i< button_count; i++){
+      sendingData.state = 0;
+      sendingData.id = button[i].id;
+      sendingData.value = i;
+      sendingData.dateTime = 0;
+      sendingData.typeOfMessage = 0;
+      esp_now_send(button[i].address.bytes, (uint8_t *) &sendingData, sizeof(sendingData));
+      if(activeButton==1){
+        button[i].activated = activeButton;
+      }
+      else{button[i].activated = 0;
+      }
+      message += String(button[i].activated) + ",";
+      Serial.println("Je tlacitko #"+String(i) +" aktivni: "+ String(button[i].activated));
+    }
+    request->send(200, "text/plain", message.c_str());
+  });
 
   server.begin();
 }
