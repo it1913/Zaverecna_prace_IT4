@@ -1,16 +1,11 @@
+#include <ESPAsyncTCP.h>
+#include <ESPAsyncWebServer.h>
 #include <Arduino.h>
 #include <ESP8266WiFi.h>
 #include <espnow.h>
+#include <common.h>
 
-const char pin_LED = D6;
-const char pin_button = D1;
 const bool automaticPress = false;
-
-struct Address {
-  uint8_t bytes[6];
-};
-
-typedef struct Address DeviceAddress;
 
 struct Device {
   DeviceAddress addr;
@@ -22,50 +17,11 @@ struct Device {
 
 typedef struct Device Device;
 
-//DeviceAddress mac_1 = {0xAC, 0x0B, 0xFB, 0xDC, 0x91, 0x79};
-//DeviceAddress mac_2 = {0x68, 0xC6, 0x3A, 0xA4, 0xC9, 0x60};
-//DeviceAddress mac_3 = {0xAC, 0x0B, 0xFB, 0xDC, 0x91, 0x79};
-
-DeviceAddress mac_1 = {0x68, 0xC6, 0x3A, 0xA4, 0xC9, 0x60};
-DeviceAddress mac_2 = {0xAC, 0x0B, 0xFB, 0xD9, 0x95, 0x58};
-DeviceAddress mac_3 = {0xAC, 0x0B, 0xFB, 0xDC, 0x91, 0x79};
-
-const int server_id = 2;
-int slave_id = 0;
+const int server_id = 0;
+int slave_id = -1;
 
 Device self;
 Device recv;
-
-struct Message {
-  int id;
-  int state;
-  int value;
-  int typeOfMessage;
-  uint32_t dateTime;
-};
-
-typedef struct Message SendData;
-typedef struct Message RecvData;
-
-SendData sendData;
-RecvData recvData;
-
-String mac2str(DeviceAddress addr) {
-  char s[20];
-  sprintf(s, "%02X:%02X:%02X:%02X:%02X:%02X",addr.bytes[0],addr.bytes[1],addr.bytes[2],addr.bytes[3],addr.bytes[4],addr.bytes[5]);  
-  return s;
-}
-
-String time2str(uint32_t millis) {
-  unsigned long allSeconds=millis/1000;
-  int runHours=allSeconds/3600;
-  int secsRemaining=allSeconds%3600;
-  int runMinutes=secsRemaining/60;
-  int runSeconds=secsRemaining%60;
-  char s[21];
-  sprintf(s,"%02d:%02d:%02d",runHours,runMinutes,runSeconds);
-  return s;
-}
 
 int check(int code, String name) {
   if (code != 0) {
@@ -90,10 +46,6 @@ void End(Device device, String name) {
   Log(device,"/",name);
 }
 
-// Insert your SSID
-const char *WIFI_SSID = "Lego3";
-const char *password = "";
-
 int32_t getWiFiChannel(const char *ssid) {
   if (int32_t n = WiFi.scanNetworks()) {
       for (uint8_t i=0; i<n; i++) {
@@ -105,18 +57,64 @@ int32_t getWiFiChannel(const char *ssid) {
   return 0;
 }
 
-void OnDataRecv(uint8_t * mac, uint8_t *incomingData, uint8_t len) {
-  memcpy(&recvData, incomingData, sizeof(recvData));
-  Begin(self,"recv");
-  if(recvData.typeOfMessage = 1){
-  Serial.printf("Received state %d and value=%d from device #%d, ",recvData.state,recvData.value,recvData.id);
-  Serial.println(time2str(recvData.dateTime));
-  self.state = recvData.state;
-  self.value = recvData.value;
-  self.waiting = LOW;
+int press(String name) {
+  Begin(self,name);
+  self.state = !self.state;
+  self.value += 1;
+  self.waiting = HIGH;
+  sendData.id = self.id;
+  sendData.state = self.state;
+  sendData.value = self.value;
+  sendData.dateTime = millis();
+  sendData.command = CMD_SWITCH_STATE;
+  sendData.response = RESP_I_SWITCHED_STATE;
+  check(esp_now_send(recv.addr.bytes, (uint8_t *) &sendData, sizeof(sendData)),"esp_now_send");
   digitalWrite(pin_LED, self.state);
-  End(self,"recv"); 
+  End(self,name);
+  return self.state;
+}
+
+int answer(String name, int command, int response, int state) {
+  Begin(self,name);
+  self.state = state;
+  self.value += 1;
+  sendData.id = self.id;
+  sendData.state = self.state;
+  sendData.value = self.value;
+  sendData.dateTime = millis();
+  sendData.command = command;
+  sendData.response = response;  
+  check(esp_now_send(recv.addr.bytes, (uint8_t *) &sendData, sizeof(sendData)),"esp_now_send");
+  digitalWrite(pin_LED, self.state);
+  End(self,name);
+  return self.state;
+}
+
+void flicker(int count, int millis) {
+  for (int i = 0; i < count; i++) {
+    digitalWrite(pin_LED, HIGH);
+    delay(millis);
+    digitalWrite(pin_LED, LOW);
+    delay(millis);
   }
+  digitalWrite(pin_LED, self.state);
+}
+
+void OnDataRecv(uint8_t * mac, uint8_t *incomingData, uint8_t len) {
+  memcpy(&recvData, incomingData, sizeof(recvData));  
+  Begin(self,"recv");
+  if(recvData.command == CMD_SWITCH_STATE){    
+    Serial.printf("Received state %d and value=%d from device #%d, ",recvData.state,recvData.value,recvData.id);
+    Serial.println(time2str(recvData.dateTime));
+    self.state = recvData.state;
+    self.value = recvData.value;
+    self.waiting = LOW;
+    digitalWrite(pin_LED, self.state);    
+  } else
+  if (recvData.command == CMD_WHO_IS_HERE) {
+    answer("i_am_here",recvData.command,RESP_I_AM_HERE,HIGH);
+  }
+  End(self,"recv"); 
 }
  
 void OnDataSent(uint8_t *mac_addr, uint8_t sendStatus) {
@@ -132,7 +130,7 @@ void setup() {
   Serial.begin(115200);
   WiFi.mode(WIFI_AP_STA);
   // Connect to Wi-Fi
-  WiFi.begin(WIFI_SSID, password);
+  WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
   while (WiFi.status() != WL_CONNECTED)
   {
     delay(1000);
@@ -162,24 +160,29 @@ void setup() {
     slave_id = 1;
     self.addr = mac_1;
     self.id = slave_id;
-    recv.addr = mac_2;
+    recv.addr = mac_0;
     recv.id = server_id;
   } else
-  if (mac == mac2str(mac_3)) {
+    if (mac == mac2str(mac_2)) {
+    slave_id = 2;
+    self.addr = mac_2;
+    self.id = slave_id;
+    recv.addr = mac_0;
+    recv.id = server_id;
+  } else
+if (mac == mac2str(mac_3)) {
     slave_id = 3;
     self.addr = mac_3;
     self.id = slave_id;
-    recv.addr = mac_2;
+    recv.addr = mac_0;
     recv.id = server_id;
   } else
-  if (mac == mac2str(mac_2)) {
-    self.addr = mac_2;
-    self.id = server_id;
-    recv.addr = mac_1;
-    recv.id = slave_id;
+  if (mac == mac2str(mac_0)) {
+    Serial.println("I am server at address "+mac);
+    return;
   } else
   {
-    Serial.println("Unknown device "+mac);
+    Serial.println("Unknown device at address "+mac);
     return;
   }
   self.state = LOW;
@@ -211,21 +214,8 @@ void setup() {
   recvData.id = self.id;
   recvData.state = self.state;
   recvData.value = self.value;
-}
 
-int press(String name) {
-  Begin(self,name);
-  self.state = !self.state;
-  self.value += 1;
-  self.waiting = HIGH;
-  sendData.id = self.id;
-  sendData.state = self.state;
-  sendData.value = self.value;
-  sendData.dateTime = millis();
-  check(esp_now_send(recv.addr.bytes, (uint8_t *) &sendData, sizeof(sendData)),"esp_now_send");
-  digitalWrite(pin_LED, self.state);
-  End(self,name);
-  return self.state;
+  flicker(10, 100);
 }
 
 unsigned long previousMillis = 0;

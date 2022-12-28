@@ -2,50 +2,9 @@
 #include <ESPAsyncTCP.h>
 #include <ESPAsyncWebServer.h>
 #include <espnow.h>
-
-const int button_count = 3;
-int activeButton = 0;
-const char pin_LED = D6;
-const char pin_button = D1;
-
-struct Address {
-  uint8_t bytes[6];
-};
-
-typedef struct Address DeviceAddress;
-
-struct Button
-{
-  int id;
-  int state;
-  DeviceAddress address;
-  int activated;
-};
-
-Button button[button_count] = {
-    {1, LOW, {0x68, 0xC6, 0x3A, 0xA4, 0xC9, 0x60},0},
-    {2, LOW, {0xAC, 0x0B, 0xFB, 0xD9, 0x95, 0x58},0},
-    {3, LOW, {0xAC, 0x0B, 0xFB, 0xDC, 0x91, 0x79},0}
-};
+#include <common.h>
 
 int self_id;
-
-struct Message {
-  int id;
-  int state;
-  int value;
-  int typeOfMessage;
-  uint32_t dateTime;
-};
-
-typedef struct Message SendingData;
-typedef struct Message ReceivingData;
-
-SendingData sendingData;
-ReceivingData receivingData;
-
-const char *WIFI_SSID = "Lego3";
-const char *password = "";
 
 AsyncWebServer server(80);
 
@@ -60,20 +19,32 @@ void OnDataSent(uint8_t *mac_addr, uint8_t sendStatus) {
   Serial.print("Last Packet Send Status: ");
   if (sendStatus == 0){
     Serial.println("Delivery success");
-    activeButton = 1;
+    /*
+    if (sendData.command == CMD_WHO_IS_HERE) {
+      int index = sendData.id-1;
+      button[index].state = HIGH;
+    }
+    */
   }
   else{
     Serial.println("Delivery fail, sendStatus = " + String(sendStatus));
-    activeButton = 0;
   }
 }
 
 void OnDataRecv(uint8_t * mac, uint8_t *incomingData, uint8_t len) {
-  memcpy(&receivingData, incomingData, sizeof(receivingData));
+  memcpy(&recvData, incomingData, sizeof(recvData));
   Serial.print("ID tlačítka je: ");
-  Serial.println(receivingData.id);
-  int index = receivingData.id-1;
-  button[index].state = receivingData.state;
+  Serial.println(recvData.id);
+  int index = recvData.id-1;
+  button[index].state = recvData.state;
+  button[index].enabled = true;
+  Serial.println("command and response "+String(recvData.command)+" "+String(recvData.response));
+  if (recvData.command == CMD_WHO_IS_HERE) {
+   //button[index].enabled = (recvData.response == RESP_I_AM_HERE);
+  } else
+  if (recvData.command == CMD_WHO_WILL_PLAY) {
+   //button[index].playing = (recvData.response == RESP_I_WILL_PLAY);
+  }
   light(button[index]);
 }
 
@@ -165,23 +136,6 @@ String outputState(Button button)
   return "";
 }
 
-String mac2str(DeviceAddress addr) {
-  char s[20];
-  sprintf(s, "%02X:%02X:%02X:%02X:%02X:%02X",addr.bytes[0],addr.bytes[1],addr.bytes[2],addr.bytes[3],addr.bytes[4],addr.bytes[5]);  
-  return s;
-}
-
-String time2str(uint32_t millis) {
-  unsigned long allSeconds=millis/1000;
-  int runHours=allSeconds/3600;
-  int secsRemaining=allSeconds%3600;
-  int runMinutes=secsRemaining/60;
-  int runSeconds=secsRemaining%60;
-  char s[21];
-  sprintf(s,"%02d:%02d:%02d",runHours,runMinutes,runSeconds);
-  return s;
-}
-
 int check(int code, String name) {
   if (code != 0) {
     Serial.println(name + " = " + String(code));
@@ -227,7 +181,7 @@ void setup()
   Serial.begin(115200);
   WiFi.mode(WIFI_AP_STA);
   // Connect to Wi-Fi
-  WiFi.begin(WIFI_SSID, password);
+  WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
   while (WiFi.status() != WL_CONNECTED)
   {
     delay(1000);
@@ -282,11 +236,12 @@ void setup()
         for (int i=0; i< button_count;  i++) {
           if ("output"+String(button[i].id) == input_id) {
             button[i].state = input_state.toInt();
-            sendingData.state = button[i].state;
-            sendingData.id = button[i].id;
-            sendingData.value = i;
-            sendingData.dateTime = millis();
-            sendingData.typeOfMessage = 1;
+            sendData.state = button[i].state;
+            sendData.id = button[i].id;
+            sendData.value = i;
+            sendData.dateTime = millis();
+            sendData.command = CMD_SWITCH_STATE;
+            sendData.response = RESP_I_SWITCHED_STATE;
             if (button[i].id == self_id) {
               light(button[i]);
             } else {
@@ -294,7 +249,7 @@ void setup()
               Serial.println("sending to #" + String(button[i].id) 
                                       + " " + mac2str(button[i].address)
                                       + " state " + String(button[i].state));
-              esp_now_send(button[i].address.bytes, (uint8_t *) &sendingData, sizeof(sendingData));
+              esp_now_send(button[i].address.bytes, (uint8_t *) &sendData, sizeof(sendData));
               //Serial.println(" after sending button id=" + String(sendingData.id));
             } 
             //Serial.println("update button "+input_id + " = " + input_state);
@@ -316,23 +271,20 @@ void setup()
 
   server.on("/whoIsHere", HTTP_GET, [](AsyncWebServerRequest *request)
   {
-    String message = "";
+    Serial.println("+whoIsHere");
     for(int i = 0; i< button_count; i++){
-      sendingData.state = 0;
-      sendingData.id = button[i].id;
-      sendingData.value = i;
-      sendingData.dateTime = 0;
-      sendingData.typeOfMessage = 0;
-      esp_now_send(button[i].address.bytes, (uint8_t *) &sendingData, sizeof(sendingData));
-      if(activeButton==1){
-        button[i].activated = activeButton;
-      }
-      else{button[i].activated = 0;
-      }
-      message += String(button[i].activated) + ",";
-      Serial.println("Je tlacitko #"+String(i) +" aktivni: "+ String(button[i].activated));
+      button[i].state = LOW;
+      sendData.state = HIGH;
+      sendData.id = button[i].id;
+      sendData.value = i;
+      sendData.dateTime = millis();
+      sendData.command = CMD_WHO_IS_HERE;
+      sendData.response = RESP_I_AM_HERE;
+      esp_now_send(button[i].address.bytes, (uint8_t *) &sendData, sizeof(sendData));
+      Serial.println("are you ready, #"+String(button[i].id)+"?");
     }
-    request->send(200, "text/plain", message.c_str());
+    request->send(200, "text/plain", "OK");
+    Serial.println("-whoIsHere");
   });
 
   server.begin();
