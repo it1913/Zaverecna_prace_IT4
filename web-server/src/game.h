@@ -12,7 +12,6 @@ void setButton(int index, int state, int command) {
     sendData.id = button[index].id;
     sendData.state = state;
     sendData.value = index;
-    sendData.dateTime = millis();
     sendData.command = command;
     sendData.response = RESP_I_SWITCHED_STATE;  
     check(esp_now_send(button[index].address.bytes, (uint8_t *) &sendData, sizeof(sendData)),"esp_now_send");

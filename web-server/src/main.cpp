@@ -309,7 +309,6 @@ void setup()
             sendData.state = button[i].state;
             sendData.id = button[i].id;
             sendData.value = i;
-            sendData.dateTime = millis();
             sendData.command = CMD_SWITCH_STATE;
             sendData.response = RESP_I_SWITCHED_STATE;
             if (button[i].id == self_id) {
@@ -348,7 +347,6 @@ void setup()
       sendData.state = WHO_IS_HERE_STATE;
       sendData.id = button[i].id;
       sendData.value = i;
-      sendData.dateTime = millis();
       sendData.command = CMD_WHO_IS_HERE;
       sendData.response = RESP_I_AM_HERE;
       esp_now_send(button[i].address.bytes, (uint8_t *) &sendData, sizeof(sendData));

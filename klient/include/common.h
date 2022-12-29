@@ -59,7 +59,6 @@ struct Message {
   int value;
   int command;
   int response;
-  uint32_t dateTime;
 };
 
 typedef struct Message SendData;

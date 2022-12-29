@@ -58,7 +58,6 @@ int press(String name) {
   sendData.id = self.id;
   sendData.state = self.state;
   sendData.value = self.value;
-  sendData.dateTime = millis();
   sendData.command = CMD_SWITCH_STATE;
   sendData.response = RESP_I_SWITCHED_STATE;
   check(esp_now_send(recv.addr.bytes, (uint8_t *) &sendData, sizeof(sendData)),"esp_now_send");
@@ -74,7 +73,6 @@ int answer(String name, int command, int response, int state) {
   sendData.id = self.id;
   sendData.state = self.state;
   sendData.value = self.value;
-  sendData.dateTime = millis();
   sendData.command = command;
   sendData.response = response;  
   check(esp_now_send(recv.addr.bytes, (uint8_t *) &sendData, sizeof(sendData)),"esp_now_send");
@@ -98,7 +96,6 @@ void OnDataRecv(uint8_t * mac, uint8_t *incomingData, uint8_t len) {
   Begin(self,"recv");
   if((recvData.command == CMD_SWITCH_STATE) || (recvData.command == CMD_SWITCH_BY_GAME)){    
     Serial.printf("Received state %d and value=%d from device #%d, ",recvData.state,recvData.value,recvData.id);
-    Serial.println(time2str(recvData.dateTime));
     self.state = recvData.state;
     self.value = recvData.value;
     self.waiting = LOW;
@@ -112,7 +109,6 @@ void OnDataRecv(uint8_t * mac, uint8_t *incomingData, uint8_t len) {
  
 void OnDataSent(uint8_t *mac_addr, uint8_t sendStatus) {
   Serial.printf("Sent state %d and value=%d to device #%d, ",sendData.state,sendData.value,recv.id);
-  Serial.println(time2str(sendData.dateTime));
   check(sendStatus,"Last Packet Send Status");
 }
 
