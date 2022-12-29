@@ -23,13 +23,6 @@ int slave_id = -1;
 Device self;
 Device recv;
 
-int check(int code, String name) {
-  if (code != 0) {
-    Serial.println(name + " = " + String(code));
-  }
-  return code;
-}
-
 void Log(Device device, String prefix, String name) {
   Serial.println(prefix
                  + " " + name   
@@ -103,7 +96,7 @@ void flicker(int count, int millis) {
 void OnDataRecv(uint8_t * mac, uint8_t *incomingData, uint8_t len) {
   memcpy(&recvData, incomingData, sizeof(recvData));  
   Begin(self,"recv");
-  if(recvData.command == CMD_SWITCH_STATE){    
+  if((recvData.command == CMD_SWITCH_STATE) || (recvData.command == CMD_SWITCH_BY_GAME)){    
     Serial.printf("Received state %d and value=%d from device #%d, ",recvData.state,recvData.value,recvData.id);
     Serial.println(time2str(recvData.dateTime));
     self.state = recvData.state;
@@ -112,7 +105,7 @@ void OnDataRecv(uint8_t * mac, uint8_t *incomingData, uint8_t len) {
     digitalWrite(pin_LED, self.state);    
   } else
   if (recvData.command == CMD_WHO_IS_HERE) {
-    answer("i_am_here",recvData.command,RESP_I_AM_HERE,HIGH);
+    answer("i_am_here",recvData.command,RESP_I_AM_HERE,WHO_IS_HERE_STATE);
   }
   End(self,"recv"); 
 }
@@ -160,24 +153,24 @@ void setup() {
     slave_id = 1;
     self.addr = mac_1;
     self.id = slave_id;
-    recv.addr = mac_0;
+    recv.addr = mac_server;
     recv.id = server_id;
   } else
     if (mac == mac2str(mac_2)) {
     slave_id = 2;
     self.addr = mac_2;
     self.id = slave_id;
-    recv.addr = mac_0;
+    recv.addr = mac_server;
     recv.id = server_id;
   } else
 if (mac == mac2str(mac_3)) {
     slave_id = 3;
     self.addr = mac_3;
     self.id = slave_id;
-    recv.addr = mac_0;
+    recv.addr = mac_server;
     recv.id = server_id;
   } else
-  if (mac == mac2str(mac_0)) {
+  if (mac == mac2str(mac_server)) {
     Serial.println("I am server at address "+mac);
     return;
   } else

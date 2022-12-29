@@ -3,22 +3,25 @@ void wait(unsigned int value) {
     delay(value);
 }
 
-void setButton(int index, int state) {
+void setButton(int index, int state, int command) {
     Button *btn = &button[index];
     if (!btn) return;
-    if (!btn->enabled) return;
-    //if (!btn.playing) return;
-    Serial.println("set button #"+String(btn->id)+" to "+String(state));
-    SendData data;     
-    btn->state = state;
-    data.id = btn->id;
-    data.state = btn->state;
-    data.value = 0;
-    data.dateTime = millis();
-    data.command = CMD_SWITCH_STATE;
-    data.response = RESP_I_SWITCHED_STATE;  
-    check(esp_now_send(btn->address.bytes, (uint8_t *) &data, sizeof(data)),"esp_now_send");
-    digitalWrite(pin_LED, btn->state);
+    //if (!button[index].enabled) return;
+    //if (!button[index].playing) return;
+    button[index].state = state;
+    sendData.id = button[index].id;
+    sendData.state = state;
+    sendData.value = index;
+    sendData.dateTime = millis();
+    sendData.command = command;
+    sendData.response = RESP_I_SWITCHED_STATE;  
+    check(esp_now_send(button[index].address.bytes, (uint8_t *) &sendData, sizeof(sendData)),"esp_now_send");
+    /*
+    Serial.println("sending to #" + String(button[index].id) 
+                                  + " " + mac2str(button[index].address)
+                                  + " state " + String(sendData.state));
+    */
+    //digitalWrite(pin_LED, btn->state);
 }
 
 int waitButton(int index, int state) {
@@ -34,24 +37,57 @@ int waitButton(int index, int state) {
 void allButtons(int state) {
     Serial.println("allButtons "+String(state));
     for (int i = 0; i < button_count; i++) {
-        setButton(i, state);
+        setButton(i, state, CMD_SWITCH_STATE);
     }
 }
 
-void runGame(){
-    /**
-    allButtons(LOW);
-    delay(1000);
-    allButtons(HIGH);
-    delay(1000);
-    allButtons(LOW);
-    **/
-    const int step_count = 9;
-    int step[step_count] = {1,3,1,3,1,3,1,3,1};
-    for (int i = 0; i < step_count; i++){
-        int index = step[i]-1;        
-        setButton(index, HIGH);
-        waitButton(index, LOW);
+int gameButtonIndex = NO_BUTTON_INDEX;
+int gameIsActive = false;
+int gameCountOfStep = 30;
+int gameCurrrentStep = 0;
+
+void gameState() {
+   //Serial.println("IsActive: "+String(gameIsActive));    
+   Serial.println("Step "+String(gameCurrrentStep)+" of "+String(gameCountOfStep)+" on #"+String(gameButtonIndex));    
+   //Serial.println("Button index: "+String(gameButtonIndex));    
+}
+
+void gameOver() {
+    if (gameIsActive && (gameCurrrentStep >= gameCountOfStep)) {     
+        Serial.println("Game over");
+        gameState();
+        gameIsActive = false;            
     }
-    allButtons(LOW);
+}
+
+void gameStop() {
+    gameState();
+    gameIsActive = false;        
+}
+
+void gameStep(){
+    //Serial.println("gameStep "+String(gameCurrrentStep)+" "+String(gameButtonIndex));
+    if (!gameIsActive) { return; };
+    if (gameButtonIndex > NO_BUTTON_INDEX) { return; };
+    //int index = rand() % button_count;
+    gameCurrrentStep++;
+    int index = 0;
+    if (gameCurrrentStep % 2 == 0)
+        { index = 0; }
+    else  
+        { index = 2; }   
+    gameButtonIndex = index;    
+    setButton(index, HIGH, CMD_SWITCH_BY_GAME);
+    delay(10);
+    gameState();
+    gameOver();
+}
+
+void gameStart() {
+  if (gameIsActive) { return; }  
+  gameIsActive = true;
+  gameCurrrentStep = 0;
+  gameButtonIndex = NO_BUTTON_INDEX;
+  Serial.println("Game start");
+  gameState();
 }

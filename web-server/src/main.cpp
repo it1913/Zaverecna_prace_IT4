@@ -17,17 +17,8 @@ int light(Button btn) {
 }
 
 void OnDataSent(uint8_t *mac_addr, uint8_t sendStatus) {
-  Serial.print("Last Packet Send Status: ");
-  if (sendStatus == 0){
-    Serial.println("Delivery success");
-    /*
-    if (sendData.command == CMD_WHO_IS_HERE) {
-      int index = sendData.id-1;
-      button[index].state = HIGH;
-    }
-    */
-  }
-  else{
+  if (sendStatus != 0){
+    Serial.print("Last Packet Send Status: ");
     Serial.println("Delivery fail, sendStatus = " + String(sendStatus));
   }
 }
@@ -39,7 +30,7 @@ void OnDataRecv(uint8_t * mac, uint8_t *incomingData, uint8_t len) {
   int index = recvData.id-1;
   button[index].state = recvData.state;
   button[index].enabled = true;
-  Serial.println("command and response "+String(recvData.command)+" "+String(recvData.response));
+  Serial.println("recv (cmd,resp,state)=("+String(recvData.command)+","+String(recvData.response)+","+String(recvData.state)+")");
   if (recvData.command == CMD_WHO_IS_HERE) {
    //button[index].enabled = (recvData.response == RESP_I_AM_HERE);
   } else
@@ -47,6 +38,11 @@ void OnDataRecv(uint8_t * mac, uint8_t *incomingData, uint8_t len) {
    //button[index].playing = (recvData.response == RESP_I_WILL_PLAY);
   }
   light(button[index]);
+  if ((recvData.command == CMD_SWITCH_STATE) and (gameButtonIndex == index) and (recvData.state == LOW)) {
+    Serial.println("End of waiting for press button #"+String(button[index].id));
+    gameButtonIndex = NO_BUTTON_INDEX;
+    recvData.command = CMD_UNDEFINED;
+  }
 }
 
 const char index_html[] PROGMEM = R"rawliteral(
@@ -67,15 +63,23 @@ const char index_html[] PROGMEM = R"rawliteral(
     input:checked+.slider {background-color: #27c437}
     input:disabled+.slider {background-color: gray}    
     input:checked+.slider:before {-webkit-transform: translateX(52px); -ms-transform: translateX(52px); transform: translateX(52px)}
+    .row { display: flex; }
+    .column { flex: 50vw; }
+    button { width: 30vw; }
   </style>
 </head>
 <body>
   <h2>ESP Output Control Web Server</h2>
-  <table>
+  <div class="row">
+    <div class="column">
 %BUTTONPLACEHOLDER%
-<tr><td><button type="button" onclick="whoIsHere()">Kontrola pripojeni</button></td></tr>
-<tr><td><button type="button" onclick="runGame()">START</button></td></tr>
-</table>
+      <div><button type="button" onclick="whoIsHere()">Kontrola pripojeni</button></div>
+      <div><button type="button" onclick="startGame()">START</button></div>
+      <div><button type="button" onclick="stopGame()">STOP</button></div>
+    </div>
+    <div class="column" id="game">
+    </div>
+  </div>
 <script>
 setInterval(function readState( ) {
   var xhttp = new XMLHttpRequest();
@@ -92,7 +96,7 @@ setInterval(function readState( ) {
   };
   xhttp.open("GET", "/state", true);
   xhttp.send();  
-},1000);
+},200);
 
 const Milliseconds = 1000; //interval pro aktualizaci stavu diod
 
@@ -122,14 +126,70 @@ function whoIsHere(element){
   xhr.send();
 }
 
-function runGame(element){
+function nextStep(element) { 
+    console.log(element.name);      
+    var xhr = new XMLHttpRequest();
+    xhr.open("GET", "/update?state=1&id="+element.name, true);
+    xhr.send();    
+    element.innerHTML = 'Done...';
+  }
+
+function startGame(element){  
+  /*
+  const stepCount = 10;
+  game = document.getElementById('game');
+
+  while (game.lastElementChild) {
+    game.removeChild(game.lastElementChild);
+  }
+
+  let steps = [];
+
+  for (let i = 0; i < stepCount; i++) {
+    let div = document.createElement('div');
+    let id = 1;
+    div.name = `output${id}`;
+    div.innerHTML = `<button type="button" id="step${i}">Step #${id}, button #${div.name}</button>`;
+    game.appendChild(div); 
+    steps.push(div);
+  }
+
+  while (element = steps.shift()) {
+    nextStep(element);
+    alert(element.name);
+  }
+  */
+  /*setTimeout(nextStep,3000,6,8);  */
+
+  /*
+  steps.forEach(element => 
+    {
+      console.log(element.name);      
+      var xhr = new XMLHttpRequest();
+      xhr.open("GET", "/update?state=1&id="+element.name, true);
+      xhr.send();
+      element.innerHTML = 'Done...';
+      delay(1000);
+    });  
+  */
+
   var xhr = new XMLHttpRequest();
   xhr.onreadystatechange = function() {
     if (this.readyState == 4 && this.status == 200) {
     }
   };
-  xhr.open("GET", "/runGame", true);
-  xhr.send();
+  xhr.open("GET", "/startGame", true);
+  xhr.send();  
+}
+
+function stopGame(element){  
+  var xhr = new XMLHttpRequest();
+  xhr.onreadystatechange = function() {
+    if (this.readyState == 4 && this.status == 200) {
+    }
+  };
+  xhr.open("GET", "/stopGame", true);
+  xhr.send();  
 }
 
 </script>
@@ -174,8 +234,8 @@ String processor(const String &var)
       String id_output = "output" + String(button[i].id);
       String disabled = "";
       if (!button[i].enabled) { disabled = " disabled"; };
-      buttons += "  <tr><td><h4>Output State LED #" + String(button[i].id) + ": <span id=\"" + id_outputState + "\"></span></h4>\n" +
-                 "  <label class=\"switch\"><input type=\"checkbox\" onchange=\"toggleCheckbox(this)\" id=\"" + id_output + "\" " + outputStateValue + disabled + "><span class=\"slider\"></span></label></td></tr>";
+      buttons += "  <div><h4>Output State LED #" + String(button[i].id) + ": <span id=\"" + id_outputState + "\"></span></h4>\n" +
+                 "  <label class=\"switch\"><input type=\"checkbox\" onchange=\"toggleCheckbox(this)\" id=\"" + id_output + "\" " + outputStateValue + disabled + "><span class=\"slider\"></span></label></div>";
     }
     return buttons;
   }
@@ -285,7 +345,7 @@ void setup()
     for(int i = 0; i< button_count; i++){
       button[i].state = LOW;
       button[i].enabled = DISABLED;
-      sendData.state = HIGH;
+      sendData.state = WHO_IS_HERE_STATE;
       sendData.id = button[i].id;
       sendData.value = i;
       sendData.dateTime = millis();
@@ -298,12 +358,20 @@ void setup()
     Serial.println("-whoIsHere");
   });
 
-  server.on("/runGame", HTTP_GET, [](AsyncWebServerRequest *request)
+  server.on("/startGame", HTTP_GET, [](AsyncWebServerRequest *request)
   {
-    Serial.println("+runGame");
-    runGame();
+    Serial.println("+startGame");
+    gameStart();
     request->send(200, "text/plain", "OK");
-    Serial.println("-runGame");
+    Serial.println("-startGame");
+  });
+
+  server.on("/stopGame", HTTP_GET, [](AsyncWebServerRequest *request)
+  {
+    Serial.println("+stopGame");
+    gameStop();
+    request->send(200, "text/plain", "OK");
+    Serial.println("-stopGame");
   });
 
   server.begin();
@@ -311,4 +379,5 @@ void setup()
 
 void loop()
 {
+  gameStep();
 }

@@ -12,6 +12,8 @@ DeviceAddress mac_1 = {0x68, 0xC6, 0x3A, 0xA4, 0xC9, 0x60};
 DeviceAddress mac_2 = {0xAC, 0x0B, 0xFB, 0xD9, 0x95, 0x58};
 DeviceAddress mac_3 = {0xAC, 0x0B, 0xFB, 0xDC, 0x91, 0x79};
 
+DeviceAddress mac_server = mac_0;
+
 struct Button
 {
   int id;
@@ -20,6 +22,9 @@ struct Button
   bool enabled; //tlacitko reaguje na zpravu CMD_I_AM_HERE odpovedi RESP_I_AM_HERE 
   bool playing; //tlacitko reagovalo na zpravu CMD_I_WILL_PLAY odpovedi RESP_I_WILL_PLAY
 };
+
+const int NO_BUTTON_INDEX = -1;
+const int WHO_IS_HERE_STATE = LOW;
 
 const int RESP_NONE = 0;
 const int RESP_I_AM_HERE = 1;
@@ -30,6 +35,7 @@ const int CMD_UNDEFINED = 0;
 const int CMD_WHO_IS_HERE = 1;
 const int CMD_WHO_WILL_PLAY = 2;
 const int CMD_SWITCH_STATE = 3;
+const int CMD_SWITCH_BY_GAME = 4;
 
 const int button_count = 3;
 const char pin_LED = D6;
@@ -85,4 +91,3 @@ int check(int code, String name) {
   }
   return code;
 }
-
