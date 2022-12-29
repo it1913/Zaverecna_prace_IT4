@@ -78,3 +78,11 @@ String time2str(uint32_t millis) {
   sprintf(s,"%02d:%02d:%02d",runHours,runMinutes,runSeconds);
   return s;
 }
+
+int check(int code, String name) {
+  if (code != 0) {
+    Serial.println(name + " = " + String(code));
+  }
+  return code;
+}
+

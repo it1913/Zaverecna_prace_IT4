@@ -3,6 +3,7 @@
 #include <ESPAsyncWebServer.h>
 #include <espnow.h>
 #include <common.h>
+#include <game.h>
 
 int self_id;
 
@@ -62,8 +63,9 @@ const char index_html[] PROGMEM = R"rawliteral(
     .switch {position: relative; display: inline-block; width: 120px; height: 68px} 
     .switch input {display: none}
     .slider {position: absolute; top: 0; left: 0; right: 0; bottom: 0; background-color: #FF0000; border-radius: 34px}
-    .slider:before {position: absolute; content: ""; height: 52px; width: 52px; left: 8px; bottom: 8px; background-color: #fff; -webkit-transition: .4s; transition: .4s; border-radius: 68px}
+    .slider:before {position: absolute; content: ""; height: 52px; width: 52px; left: 8px; bottom: 8px; background-color: #fff; -webkit-transition: .4s; transition: .4s; border-radius: 68px}    
     input:checked+.slider {background-color: #27c437}
+    input:disabled+.slider {background-color: gray}    
     input:checked+.slider:before {-webkit-transform: translateX(52px); -ms-transform: translateX(52px); transform: translateX(52px)}
   </style>
 </head>
@@ -72,6 +74,7 @@ const char index_html[] PROGMEM = R"rawliteral(
   <table>
 %BUTTONPLACEHOLDER%
 <tr><td><button type="button" onclick="whoIsHere()">Kontrola pripojeni</button></td></tr>
+<tr><td><button type="button" onclick="runGame()">START</button></td></tr>
 </table>
 <script>
 setInterval(function readState( ) {
@@ -81,8 +84,9 @@ setInterval(function readState( ) {
       const state = this.responseText.split(',').map(Number);
       const elements = document.querySelectorAll('input');      
       elements.forEach((el, index) => { 
-        el.checked = state[index]; 
-        document.getElementById("outputState"+(index+1)).innerHTML = (state[index] ? "ON" : "OFF" );
+        el.checked = Boolean(state[index] & 1); 
+        el.disabled = Boolean(state[index] & 2);
+        document.getElementById("outputState"+(index+1)).innerHTML = (el.checked ? "ON" : "OFF" );
       });
     }
   };
@@ -108,12 +112,23 @@ function whoIsHere(element){
       const state = this.responseText.split(',').map(Number);
       const elements = document.querySelectorAll('input');      
       elements.forEach((el, index) => { 
-        el.checked = state[index]; 
-        document.getElementById("outputState"+(index+1)).innerHTML = (state[index] ? "ON" : "OFF" );
+        el.checked = Boolean(state[index] & 1); 
+        el.disabled = Boolean(state[index] & 2);
+        document.getElementById("outputState"+(index+1)).innerHTML = (el.checked ? "ON" : "OFF" );
       });
     }
   };
   xhr.open("GET", "/whoIsHere", true);
+  xhr.send();
+}
+
+function runGame(element){
+  var xhr = new XMLHttpRequest();
+  xhr.onreadystatechange = function() {
+    if (this.readyState == 4 && this.status == 200) {
+    }
+  };
+  xhr.open("GET", "/runGame", true);
   xhr.send();
 }
 
@@ -134,13 +149,6 @@ String outputState(Button button)
     return "";
   }
   return "";
-}
-
-int check(int code, String name) {
-  if (code != 0) {
-    Serial.println(name + " = " + String(code));
-  }
-  return code;
 }
 
 int32_t getWiFiChannel(const char *ssid) {
@@ -164,8 +172,10 @@ String processor(const String &var)
       String outputStateValue = outputState(button[i]);
       String id_outputState = "outputState" + String(button[i].id);
       String id_output = "output" + String(button[i].id);
+      String disabled = "";
+      if (!button[i].enabled) { disabled = " disabled"; };
       buttons += "  <tr><td><h4>Output State LED #" + String(button[i].id) + ": <span id=\"" + id_outputState + "\"></span></h4>\n" +
-                 "  <label class=\"switch\"><input type=\"checkbox\" onchange=\"toggleCheckbox(this)\" id=\"" + id_output + "\" " + outputStateValue + "><span class=\"slider\"></span></label></td></tr>";
+                 "  <label class=\"switch\"><input type=\"checkbox\" onchange=\"toggleCheckbox(this)\" id=\"" + id_output + "\" " + outputStateValue + disabled + "><span class=\"slider\"></span></label></td></tr>";
     }
     return buttons;
   }
@@ -263,7 +273,7 @@ void setup()
     {
       String message = "";
       for (int i=0; i< button_count;  i++) {
-        message += String(button[i].state) + ",";
+        message += String(button[i].state+2*!button[i].enabled) + ",";
       } 
       //Serial.println("read state "+ message);
       request->send(200, "text/plain", message.c_str());
@@ -274,6 +284,7 @@ void setup()
     Serial.println("+whoIsHere");
     for(int i = 0; i< button_count; i++){
       button[i].state = LOW;
+      button[i].enabled = DISABLED;
       sendData.state = HIGH;
       sendData.id = button[i].id;
       sendData.value = i;
@@ -285,6 +296,14 @@ void setup()
     }
     request->send(200, "text/plain", "OK");
     Serial.println("-whoIsHere");
+  });
+
+  server.on("/runGame", HTTP_GET, [](AsyncWebServerRequest *request)
+  {
+    Serial.println("+runGame");
+    runGame();
+    request->send(200, "text/plain", "OK");
+    Serial.println("-runGame");
   });
 
   server.begin();
