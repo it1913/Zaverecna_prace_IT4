@@ -3,11 +3,13 @@
 #include <ESPAsyncWebServer.h>
 #include <espnow.h>
 #include <common.h>
+#include <classes.h>
 #include <game.h>
 
 int self_id;
 
 AsyncWebServer server(80);
+AsyncWebSocket ws("/ws");
 
 int light(Button btn) {
   //digitalWrite(pin_LED, btn.state);
@@ -42,14 +44,22 @@ void OnDataRecv(uint8_t * mac, uint8_t *incomingData, uint8_t len) {
    //button[index].playing = (recvData.response == RESP_I_WILL_PLAY);
   }
   light(button[index]);
-  if ((recvData.command == CMD_SWITCH_STATE) and (gameButtonIndex == index) and (recvData.state == LOW)) {
+  if ((recvData.command == CMD_SWITCH_STATE) and (game.buttonIndex == index) and (recvData.state == LOW)) {
     if (LOG_RECV) {
       Serial.println("End of waiting for press button #"+String(button[index].id));
     }
-    gameButtonIndex = NO_BUTTON_INDEX;
+    game.buttonIndex = NO_BUTTON_INDEX;
     recvData.command = CMD_UNDEFINED;
   }
 }
+
+/* sockets */
+
+// void notifyClients() {
+//   ws.textAll(String(ledState));
+// }
+
+/* sockets */
 
 const char index_html[] PROGMEM = R"rawliteral(
 <!DOCTYPE HTML><html>
@@ -329,19 +339,12 @@ void setup()
 
   server.on("/startGame", HTTP_GET, [](AsyncWebServerRequest *request)
   {
-      String parameter_stepCount = "stepCount"; 
-      // /startGame?stepCount=<stepCount>
-      if (request->hasParam(parameter_stepCount)) {
-        String stepCount = request->getParam(parameter_stepCount)->value();
-        gameStart(stepCount.toInt());
-      }
-    request->send(200, "text/plain", "OK");
+      game.handleStart(request);
   });
 
   server.on("/stopGame", HTTP_GET, [](AsyncWebServerRequest *request)
   {
-    gameStop();
-    request->send(200, "text/plain", "OK");
+      game.handleStop(request);
   });
 
   server.begin();
@@ -349,5 +352,6 @@ void setup()
 
 void loop()
 {
-  gameStep();
+  ws.cleanupClients();
+  game.step();
 }
