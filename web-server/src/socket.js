@@ -16,22 +16,8 @@
     setTimeout(initWebSocket, 2000);
   }
   function onMessage(event) {
-    var state;
-    if (event.data == "1"){
-      state = "ON";
-    }
-    else{
-      state = "OFF";
-    }
-    document.getElementById('state').innerHTML = state;
-  }
+    document.getElementById('game').innerHTML = event.data;
+  }        
   function onLoad(event) {
     initWebSocket();
-    initButton();
-  }
-  function initButton() {
-    document.getElementById('button').addEventListener('click', toggle);
-  }
-  function toggle(){
-    websocket.send('toggle');
   }

@@ -138,7 +138,7 @@ class Game {
 
         String notifyText() {
             //text, ktery se bude posilat na klienty pres websockety pri zmene stavu
-            return String(isActive);
+            return data();
         }
 
         int handleWebSocketMessage(void *arg, uint8_t *data, size_t len) {

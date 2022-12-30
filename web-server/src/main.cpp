@@ -18,6 +18,11 @@ int light(Button btn) {
   return btn.state;
 }
 
+void notifyClients() {
+  ws.textAll(game.notifyText());
+  Serial.println("notifyClients: "+game.notifyText());
+}
+
 void OnDataSent(uint8_t *mac_addr, uint8_t sendStatus) {
   if (LOG_SEND && (sendStatus != 0)){
     Serial.print("Last Packet Send Status: ");
@@ -50,6 +55,7 @@ void OnDataRecv(uint8_t * mac, uint8_t *incomingData, uint8_t len) {
     }
     game.buttonIndex = NO_BUTTON_INDEX;
     recvData.command = CMD_UNDEFINED;
+    notifyClients();
   }
 }
 
@@ -57,10 +63,6 @@ void OnDataRecv(uint8_t * mac, uint8_t *incomingData, uint8_t len) {
   Zpracovano podle prikladu: 
   https://randomnerdtutorials.com/esp32-websocket-server-arduino/?fbclid=IwAR3p-KTpddU7N6ht95dzeSMY4_dnYLVAUVALZK73QKHJWcdE5932p6gn7fw 
 */
-
-void notifyClients() {
-  ws.textAll(game.notifyText());  
-}
 
 void handleWebSocketMessage(void *arg, uint8_t *data, size_t len) {
   AwsFrameInfo *info = (AwsFrameInfo*)arg;
@@ -147,6 +149,33 @@ const char index_html[] PROGMEM = R"rawliteral(
     </div>
   </div>
 <script>
+  var gateway = `ws://${window.location.hostname}/ws`;
+  var websocket;
+  window.addEventListener('load', onLoad);
+  function initWebSocket() {
+    console.log('Trying to open a WebSocket connection...');
+    websocket = new WebSocket(gateway);
+    websocket.onopen    = onOpen;
+    websocket.onclose   = onClose;
+    websocket.onmessage = onMessage; // <-- add this line
+  }
+  function onOpen(event) {
+    console.log('Connection opened');
+  }
+  function onClose(event) {
+    console.log('Connection closed');
+    setTimeout(initWebSocket, 2000);
+  }
+  function onMessage(event) {
+    let el = document.getElementById('game');
+    if (el) {
+      el.innerHTML = event.data;
+    }
+  }        
+  function onLoad(event) {
+    initWebSocket();
+  }
+
 setInterval(function readState( ) {
   var xhttp = new XMLHttpRequest();
   xhttp.onreadystatechange = function() {
@@ -156,7 +185,10 @@ setInterval(function readState( ) {
       elements.forEach((el, index) => { 
         el.checked = Boolean(state[index] & 1); 
         el.disabled = Boolean(state[index] & 2);
-        document.getElementById("outputState"+(index+1)).innerHTML = (el.checked ? "ON" : "OFF" );
+        os = document.getElementById("outputState"+(index+1));
+        if (os) {
+          os.innerHTML = (el.checked ? "ON" : "OFF" );
+        };  
       });
     }
   };
@@ -184,7 +216,10 @@ function whoIsHere(element){
       elements.forEach((el, index) => { 
         el.checked = Boolean(state[index] & 1); 
         el.disabled = Boolean(state[index] & 2);
-        document.getElementById("outputState"+(index+1)).innerHTML = (el.checked ? "ON" : "OFF" );
+        os = document.getElementById("outputState"+(index+1));
+        if (os) {
+          os.innerHTML = (el.checked ? "ON" : "OFF" );
+        };  
       });
     }
   };
