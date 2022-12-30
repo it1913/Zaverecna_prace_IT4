@@ -1,9 +1,42 @@
 class Game {
+    private:
+        boolean isValidButtonIndex(int index) {
+            return ((index>=0) && (index<button_count) && (button[index].enabled) && (index != buttonIndex));
+            /*  Posledni podminka rika, ze dalsi musi byt jiny nez aktualni 
+                a je pouze docasna, nez se podari odstranit chybku v metode loop,
+                kde dochazi k preskovani kroku, pokus je nasledujici tlacitko stejne
+                jako aktualni.
+            */
+        }
+        int nextButtonIndex() {
+            int index = rand() % button_count;
+            if (isValidButtonIndex(index)) return index;
+            int i;
+            i = index-1;
+            while (i>=0) {
+                if (isValidButtonIndex(i)) return i;
+                i--;
+            };
+            i = index+1;
+            while (i<button_count) {
+                if (isValidButtonIndex(i)) return i;
+                i++;
+            };
+            return NO_BUTTON_INDEX;
+        }
+        void testButtonIndex() {
+            //Pomocna metoda, ktera slouzi k otestovani vyberu dalsiho tlacitka
+            for (int i = 0; i < stepCount; i++) {
+                int prevIndex = buttonIndex;
+                buttonIndex = nextButtonIndex();
+                Serial.println("go from "+String(prevIndex)+" to "+String(buttonIndex));                
+            }
+        }
     public:        
-        int isActive;
-        int stepCount;
-        int currrentStep; 
-        int buttonIndex;
+        int isActive;       //je hra aktivni?
+        int stepCount;      //celkovy pocet kroku
+        int currrentStep;   //aktualni krok
+        int buttonIndex;    //index aktualniho tlacitka
 
         Game(int AStepCount) { 
             buttonIndex = NO_BUTTON_INDEX;
@@ -19,6 +52,7 @@ class Game {
         } 
 
         int isOver() {
+            //test, zda uz neni konec + vraceni odpovidajici hodnoty
             if (isActive && (currrentStep > stepCount)) {             
                 Serial.println("Game over");
                 isActive = false;            
@@ -27,6 +61,7 @@ class Game {
         }
 
         void stop() {
+            //zastaveni/ukonceni hry
             if (isActive){        
                 printState();
                 isActive = false;        
@@ -34,19 +69,23 @@ class Game {
             }
         }
 
-        void step(){
-            //Serial.println("gameStep "+String(gameCurrrentStep)+" "+String(gameButtonIndex));
+        void loop(){
+            //aktualizacni metoda volana v loopu aplikace
             if (!isActive) { return; };
             if (buttonIndex > NO_BUTTON_INDEX) { return; };
-            //int index = rand() % button_count;
             currrentStep++;
             if (isOver()) { return; };
-            int index = 0;
-            if (currrentStep % 2 == 0)
-                { index = 0; }
-            else  
-                { index = 2; }   
+
+            //urceni dalsiho tlacitka
+            int index = nextButtonIndex();
+            Serial.println("Next  button index is "+String(index));
+            if (index == NO_BUTTON_INDEX) {
+                //kdyz se nepodari urcit dalsi tlacitko, ukoncit hru
+                stop();
+                return;
+            }
             buttonIndex = index;    
+
             setButton(index, HIGH, CMD_SWITCH_BY_GAME);
             delay(10);
             printState();    

@@ -353,5 +353,5 @@ void setup()
 void loop()
 {
   ws.cleanupClients();
-  game.step();
+  game.loop();
 }
