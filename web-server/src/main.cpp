@@ -53,13 +53,49 @@ void OnDataRecv(uint8_t * mac, uint8_t *incomingData, uint8_t len) {
   }
 }
 
-/* sockets */
+/* Web sockets: 
+  Zpracovano podle prikladu: 
+  https://randomnerdtutorials.com/esp32-websocket-server-arduino/?fbclid=IwAR3p-KTpddU7N6ht95dzeSMY4_dnYLVAUVALZK73QKHJWcdE5932p6gn7fw 
+*/
 
-// void notifyClients() {
-//   ws.textAll(String(ledState));
-// }
+void notifyClients() {
+  ws.textAll(game.notifyText());  
+}
 
-/* sockets */
+void handleWebSocketMessage(void *arg, uint8_t *data, size_t len) {
+  AwsFrameInfo *info = (AwsFrameInfo*)arg;
+  if (info->final && info->index == 0 && info->len == len && info->opcode == WS_TEXT) {
+    data[len] = 0;
+    if (game.handleWebSocketMessage(arg, data, len) == 0) {
+      notifyClients();
+    }
+  }
+}
+
+void onEvent(AsyncWebSocket *server, AsyncWebSocketClient *client, AwsEventType type,
+             void *arg, uint8_t *data, size_t len) {
+  switch (type) {
+    case WS_EVT_CONNECT:
+      Serial.printf("WebSocket client #%u connected from %s\n", client->id(), client->remoteIP().toString().c_str());
+      break;
+    case WS_EVT_DISCONNECT:
+      Serial.printf("WebSocket client #%u disconnected\n", client->id());
+      break;
+    case WS_EVT_DATA:
+      handleWebSocketMessage(arg, data, len);
+      break;
+    case WS_EVT_PONG:
+    case WS_EVT_ERROR:
+      break;
+  }
+}
+
+void initWebSocket() {
+  ws.onEvent(onEvent);
+  server.addHandler(&ws);
+}
+
+/* Web sockets */
 
 const char index_html[] PROGMEM = R"rawliteral(
 <!DOCTYPE HTML><html>
@@ -107,6 +143,7 @@ const char index_html[] PROGMEM = R"rawliteral(
       </div>
     </div>
     <div class="column" id="game">
+%GAMEDATAHOLDER%    
     </div>
   </div>
 <script>
@@ -222,6 +259,9 @@ String processor(const String &var)
                  "  <label class=\"switch\"><input type=\"checkbox\" onchange=\"toggleCheckbox(this)\" id=\"" + id_output + "\" " + outputStateValue + disabled + "><span class=\"slider\"></span></label></div>";
     }
     return buttons;
+  } else
+  if (var == "GAMEDATAHOLDER") {
+    return game.data();
   }
   return String("");
 }
@@ -347,6 +387,7 @@ void setup()
       game.handleStop(request);
   });
 
+  initWebSocket();
   server.begin();
 }
 

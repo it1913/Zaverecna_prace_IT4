@@ -35,25 +35,25 @@ class Game {
     public:        
         int isActive;       //je hra aktivni?
         int stepCount;      //celkovy pocet kroku
-        int currrentStep;   //aktualni krok
+        int currentStep;    //aktualni krok
         int buttonIndex;    //index aktualniho tlacitka
 
         Game(int AStepCount) { 
             buttonIndex = NO_BUTTON_INDEX;
             isActive = false;
             stepCount = AStepCount;
-            currrentStep = 0; 
+            currentStep = 0; 
         }; 
 
         void printState() {
             //Serial.println("IsActive: "+String(isActive));    
-            Serial.println("Waiting press button #"+String(buttonIndex)+", step "+String(currrentStep)+" of "+String(stepCount));    
+            Serial.println("Waiting press button #"+String(buttonIndex)+", step "+String(currentStep)+" of "+String(stepCount));    
             //Serial.println("Button index: "+String(buttonIndex));    
         } 
 
         int isOver() {
             //test, zda uz neni konec + vraceni odpovidajici hodnoty
-            if (isActive && (currrentStep > stepCount)) {             
+            if (isActive && (currentStep > stepCount)) {             
                 Serial.println("Game over");
                 isActive = false;            
             }
@@ -65,7 +65,7 @@ class Game {
             if (isActive){        
                 printState();
                 isActive = false;        
-                currrentStep = 0;
+                currentStep = 0;
             }
         }
 
@@ -73,7 +73,7 @@ class Game {
             //aktualizacni metoda volana v loopu aplikace
             if (!isActive) { return; };
             if (buttonIndex > NO_BUTTON_INDEX) { return; };
-            currrentStep++;
+            currentStep++;
             if (isOver()) { return; };
 
             //urceni dalsiho tlacitka
@@ -94,7 +94,7 @@ class Game {
         void start(int AStepCount) {
             if (isActive) { return; } 
             stepCount = AStepCount;   
-            currrentStep = 0;
+            currentStep = 0;
             buttonIndex = NO_BUTTON_INDEX;
             Serial.println("Game start");
             isActive = true;
@@ -136,6 +136,22 @@ class Game {
             //digitalWrite(pin_LED, btn->state);
         }
 
+        String notifyText() {
+            //text, ktery se bude posilat na klienty pres websockety pri zmene stavu
+            return String(isActive);
+        }
+
+        int handleWebSocketMessage(void *arg, uint8_t *data, size_t len) {
+            //obsluha zprav od klientů
+            return 0;
+        }
+
+        String data() {
+            return "<div>isActive: " + String(isActive) + "<br>" +
+                "progress: " + String(currentStep) + " of " + String(stepCount) + "<br>" +
+                "button index: " + String(buttonIndex) +
+                "</div>";
+        }
 };
 
 Game game(10);
