@@ -25,6 +25,8 @@ struct Button
 
 const int NO_BUTTON_INDEX = -1;
 const int WHO_IS_HERE_STATE = LOW;
+const boolean LOG_RECV = false;
+const boolean LOG_SEND = false;
 
 const int RESP_NONE = 0;
 const int RESP_I_AM_HERE = 1;

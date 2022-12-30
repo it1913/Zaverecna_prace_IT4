@@ -11,13 +11,13 @@ AsyncWebServer server(80);
 
 int light(Button btn) {
   //digitalWrite(pin_LED, btn.state);
-  Serial.printf("Button #%d: state of LED %d = %d",btn.id,pin_LED,btn.state);
-  Serial.println();
+  //Serial.printf("Button #%d: state of LED %d = %d",btn.id,pin_LED,btn.state);
+  //Serial.println();
   return btn.state;
 }
 
 void OnDataSent(uint8_t *mac_addr, uint8_t sendStatus) {
-  if (sendStatus != 0){
+  if (LOG_SEND && (sendStatus != 0)){
     Serial.print("Last Packet Send Status: ");
     Serial.println("Delivery fail, sendStatus = " + String(sendStatus));
   }
@@ -25,12 +25,16 @@ void OnDataSent(uint8_t *mac_addr, uint8_t sendStatus) {
 
 void OnDataRecv(uint8_t * mac, uint8_t *incomingData, uint8_t len) {
   memcpy(&recvData, incomingData, sizeof(recvData));
-  Serial.print("ID tlačítka je: ");
-  Serial.println(recvData.id);
+  if (LOG_RECV) {
+    Serial.print("ID tlačítka je: ");
+    Serial.println(recvData.id);
+  }    
   int index = recvData.id-1;
   button[index].state = recvData.state;
   button[index].enabled = true;
-  Serial.println("recv (cmd,resp,state)=("+String(recvData.command)+","+String(recvData.response)+","+String(recvData.state)+")");
+  if (LOG_RECV){
+    Serial.println("recv (cmd,resp,state)=("+String(recvData.command)+","+String(recvData.response)+","+String(recvData.state)+")");
+  }
   if (recvData.command == CMD_WHO_IS_HERE) {
    //button[index].enabled = (recvData.response == RESP_I_AM_HERE);
   } else
@@ -39,7 +43,9 @@ void OnDataRecv(uint8_t * mac, uint8_t *incomingData, uint8_t len) {
   }
   light(button[index]);
   if ((recvData.command == CMD_SWITCH_STATE) and (gameButtonIndex == index) and (recvData.state == LOW)) {
-    Serial.println("End of waiting for press button #"+String(button[index].id));
+    if (LOG_RECV) {
+      Serial.println("End of waiting for press button #"+String(button[index].id));
+    }
     gameButtonIndex = NO_BUTTON_INDEX;
     recvData.command = CMD_UNDEFINED;
   }
@@ -73,9 +79,22 @@ const char index_html[] PROGMEM = R"rawliteral(
   <div class="row">
     <div class="column">
 %BUTTONPLACEHOLDER%
-      <div><button type="button" onclick="whoIsHere()">Kontrola pripojeni</button></div>
+      <div><button type="button" onclick="whoIsHere()">INIT</button></div>
       <div><button type="button" onclick="startGame()">START</button></div>
       <div><button type="button" onclick="stopGame()">STOP</button></div>
+      <div>
+        <label for="stepCount">Step count:</label>
+        <input type="number" id="stepCount" min="1" max="100" value="10">
+      </div>
+      <div>
+        <label for="cars">Choose a player:</label>
+        <select id="players">
+          <option value="martin">Martin</option>
+          <option value="petr">Petr</option>
+          <option value="pavel">Pavel</option>
+          <option value="josef">Josef</option>
+        </select>      
+      </div>
     </div>
     <div class="column" id="game">
     </div>
@@ -126,59 +145,14 @@ function whoIsHere(element){
   xhr.send();
 }
 
-function nextStep(element) { 
-    console.log(element.name);      
-    var xhr = new XMLHttpRequest();
-    xhr.open("GET", "/update?state=1&id="+element.name, true);
-    xhr.send();    
-    element.innerHTML = 'Done...';
-  }
-
-function startGame(element){  
-  /*
-  const stepCount = 10;
-  game = document.getElementById('game');
-
-  while (game.lastElementChild) {
-    game.removeChild(game.lastElementChild);
-  }
-
-  let steps = [];
-
-  for (let i = 0; i < stepCount; i++) {
-    let div = document.createElement('div');
-    let id = 1;
-    div.name = `output${id}`;
-    div.innerHTML = `<button type="button" id="step${i}">Step #${id}, button #${div.name}</button>`;
-    game.appendChild(div); 
-    steps.push(div);
-  }
-
-  while (element = steps.shift()) {
-    nextStep(element);
-    alert(element.name);
-  }
-  */
-  /*setTimeout(nextStep,3000,6,8);  */
-
-  /*
-  steps.forEach(element => 
-    {
-      console.log(element.name);      
-      var xhr = new XMLHttpRequest();
-      xhr.open("GET", "/update?state=1&id="+element.name, true);
-      xhr.send();
-      element.innerHTML = 'Done...';
-      delay(1000);
-    });  
-  */
-
+function startGame(element){ 
+  let stepCount = document.getElementById("stepCount").value;
   var xhr = new XMLHttpRequest();
   xhr.onreadystatechange = function() {
     if (this.readyState == 4 && this.status == 200) {
     }
   };
-  xhr.open("GET", "/startGame", true);
+  xhr.open("GET", "/startGame?stepCount="+stepCount, true);
   xhr.send();  
 }
 
@@ -340,7 +314,6 @@ void setup()
 
   server.on("/whoIsHere", HTTP_GET, [](AsyncWebServerRequest *request)
   {
-    Serial.println("+whoIsHere");
     for(int i = 0; i< button_count; i++){
       button[i].state = LOW;
       button[i].enabled = DISABLED;
@@ -350,26 +323,25 @@ void setup()
       sendData.command = CMD_WHO_IS_HERE;
       sendData.response = RESP_I_AM_HERE;
       esp_now_send(button[i].address.bytes, (uint8_t *) &sendData, sizeof(sendData));
-      Serial.println("are you ready, #"+String(button[i].id)+"?");
     }
     request->send(200, "text/plain", "OK");
-    Serial.println("-whoIsHere");
   });
 
   server.on("/startGame", HTTP_GET, [](AsyncWebServerRequest *request)
   {
-    Serial.println("+startGame");
-    gameStart();
+      String parameter_stepCount = "stepCount"; 
+      // /startGame?stepCount=<stepCount>
+      if (request->hasParam(parameter_stepCount)) {
+        String stepCount = request->getParam(parameter_stepCount)->value();
+        gameStart(stepCount.toInt());
+      }
     request->send(200, "text/plain", "OK");
-    Serial.println("-startGame");
   });
 
   server.on("/stopGame", HTTP_GET, [](AsyncWebServerRequest *request)
   {
-    Serial.println("+stopGame");
     gameStop();
     request->send(200, "text/plain", "OK");
-    Serial.println("-stopGame");
   });
 
   server.begin();

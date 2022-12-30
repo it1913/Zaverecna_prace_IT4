@@ -23,45 +23,30 @@ void setButton(int index, int state, int command) {
     //digitalWrite(pin_LED, btn->state);
 }
 
-int waitButton(int index, int state) {
-    Button *btn = &button[index];
-    if (!btn) return 0;
-    if (!btn->enabled) return 0;
-    while (btn->state != state) {
-        wait(10000);
-    }
-    return 0;
-}
-
-void allButtons(int state) {
-    Serial.println("allButtons "+String(state));
-    for (int i = 0; i < button_count; i++) {
-        setButton(i, state, CMD_SWITCH_STATE);
-    }
-}
-
 int gameButtonIndex = NO_BUTTON_INDEX;
 int gameIsActive = false;
-int gameCountOfStep = 30;
+int gameStepCount = 4;
 int gameCurrrentStep = 0;
 
 void gameState() {
    //Serial.println("IsActive: "+String(gameIsActive));    
-   Serial.println("Step "+String(gameCurrrentStep)+" of "+String(gameCountOfStep)+" on #"+String(gameButtonIndex));    
+   Serial.println("Waiting press button #"+String(gameButtonIndex)+", step "+String(gameCurrrentStep)+" of "+String(gameStepCount));    
    //Serial.println("Button index: "+String(gameButtonIndex));    
 }
 
 void gameOver() {
-    if (gameIsActive && (gameCurrrentStep >= gameCountOfStep)) {     
+    if (gameIsActive && (gameCurrrentStep > gameStepCount)) {             
         Serial.println("Game over");
-        gameState();
         gameIsActive = false;            
     }
 }
 
 void gameStop() {
-    gameState();
-    gameIsActive = false;        
+    if (gameIsActive){        
+        gameState();
+        gameIsActive = false;        
+        gameCurrrentStep = 0;
+    }
 }
 
 void gameStep(){
@@ -70,6 +55,8 @@ void gameStep(){
     if (gameButtonIndex > NO_BUTTON_INDEX) { return; };
     //int index = rand() % button_count;
     gameCurrrentStep++;
+    gameOver();  
+    if (!gameIsActive) { return; };  
     int index = 0;
     if (gameCurrrentStep % 2 == 0)
         { index = 0; }
@@ -78,15 +65,15 @@ void gameStep(){
     gameButtonIndex = index;    
     setButton(index, HIGH, CMD_SWITCH_BY_GAME);
     delay(10);
-    gameState();
-    gameOver();
+    gameState();    
 }
 
-void gameStart() {
-  if (gameIsActive) { return; }  
-  gameIsActive = true;
+void gameStart(int stepCount) {
+  if (gameIsActive) { return; } 
+  gameStepCount = stepCount;   
   gameCurrrentStep = 0;
   gameButtonIndex = NO_BUTTON_INDEX;
   Serial.println("Game start");
+  gameIsActive = true;
   gameState();
 }

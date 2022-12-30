@@ -1,0 +1,64 @@
+  function nextStep(element) { 
+    console.log(element.name);      
+    var xhr = new XMLHttpRequest();
+    xhr.open("GET", "/update?state=1&id="+element.name, true);
+    xhr.send();    
+    element.innerHTML = 'Done...';
+  }
+
+
+  
+  /*
+  const stepCount = 10;
+  game = document.getElementById('game');
+
+  while (game.lastElementChild) {
+    game.removeChild(game.lastElementChild);
+  }
+
+  let steps = [];
+
+  for (let i = 0; i < stepCount; i++) {
+    let div = document.createElement('div');
+    let id = 1;
+    div.name = `output${id}`;
+    div.innerHTML = `<button type="button" id="step${i}">Step #${id}, button #${div.name}</button>`;
+    game.appendChild(div); 
+    steps.push(div);
+  }
+
+  while (element = steps.shift()) {
+    nextStep(element);
+    alert(element.name);
+  }
+  */
+  /*setTimeout(nextStep,3000,6,8);  */
+
+  /*
+  steps.forEach(element => 
+    {
+      console.log(element.name);      
+      var xhr = new XMLHttpRequest();
+      xhr.open("GET", "/update?state=1&id="+element.name, true);
+      xhr.send();
+      element.innerHTML = 'Done...';
+      delay(1000);
+    });  
+  */
+
+var
+  gameUpdateInterval;  
+
+    function sayHello(){
+        document.getElementById("myDiv").innerHTML += '<p>Hello World!</p>';
+    }
+    
+    // Function to start setInterval call
+    function start(){
+        intervalID = setInterval(sayHello, 1000);
+    }
+
+    // Function to stop setInterval call
+    function stop(){
+        clearInterval(intervalID);
+    }  
