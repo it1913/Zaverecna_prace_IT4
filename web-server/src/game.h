@@ -1,6 +1,21 @@
+const int STATE_OFF = 0;
+const int STATE_ON = 1;
+const int STATE_OVER = 2;
+
+typedef std::function<void(int value)> StateCallback;
+
 class Game {
     private:
-        boolean isValidButtonIndex(int index) {
+        int state;
+        StateCallback stateCallback;
+        void setState(int value) { 
+            if (state != value) {
+                state = value; 
+                Serial.println("GAME IS " + stateText());
+            }
+            if (stateCallback) stateCallback(state);
+        }
+        bool isValidButtonIndex(int index) {
             return ((index>=0) && (index<button_count) && (button[index].enabled) && (index != buttonIndex));
             /*  Posledni podminka rika, ze dalsi musi byt jiny nez aktualni 
                 a je pouze docasna, nez se podari odstranit chybku v metode loop,
@@ -33,14 +48,26 @@ class Game {
             }
         }
     public:        
-        int isActive;       //je hra aktivni?
+        bool isOff() {      //je hra stopnuta?
+            return (state == STATE_OFF);
+        }
+        bool isActive() {   //je hra aktivni?
+            return (state == STATE_ON);
+        }
+        bool isOver() {     // hra skoncila?
+            //test, zda uz neni konec + vraceni odpovidajici hodnoty
+            if (isActive() && (currentStep > stepCount)) {             
+                setState(STATE_OVER);            
+            }
+            return (state == STATE_OVER);
+        }
         int stepCount;      //celkovy pocet kroku
         int currentStep;    //aktualni krok
         int buttonIndex;    //index aktualniho tlacitka
 
         Game(int AStepCount) { 
             buttonIndex = NO_BUTTON_INDEX;
-            isActive = false;
+            setState(STATE_OFF);
             stepCount = AStepCount;
             currentStep = 0; 
         }; 
@@ -51,27 +78,18 @@ class Game {
             //Serial.println("Button index: "+String(buttonIndex));    
         } 
 
-        int isOver() {
-            //test, zda uz neni konec + vraceni odpovidajici hodnoty
-            if (isActive && (currentStep > stepCount)) {             
-                Serial.println("Game over");
-                isActive = false;            
-            }
-            return !isActive;
-        }
-
         void stop() {
             //zastaveni/ukonceni hry
-            if (isActive){        
+            if (!isOff()){        
                 printState();
-                isActive = false;        
+                setState(STATE_OFF);        
                 currentStep = 0;
             }
         }
 
         void loop(){
             //aktualizacni metoda volana v loopu aplikace
-            if (!isActive) { return; };
+            if (!isActive()) { return; };
             if (buttonIndex > NO_BUTTON_INDEX) { return; };
             currentStep++;
             if (isOver()) { return; };
@@ -92,12 +110,11 @@ class Game {
         }
 
         void start(int AStepCount) {
-            if (isActive) { return; } 
+            if (isActive()) { return; } 
             stepCount = AStepCount;   
             currentStep = 0;
             buttonIndex = NO_BUTTON_INDEX;
-            Serial.println("Game start");
-            isActive = true;
+            setState(STATE_ON);
             printState();
         }
 
@@ -136,6 +153,10 @@ class Game {
             //digitalWrite(pin_LED, btn->state);
         }
 
+        void setStateCallback(StateCallback value) {
+            stateCallback = value;
+        }
+
         String notifyText() {
             //text, ktery se bude posilat na klienty pres websockety pri zmene stavu
             return data();
@@ -146,12 +167,42 @@ class Game {
             return 0;
         }
 
+        String stateText() {
+            switch(state) {
+                case STATE_OFF:
+                    return "OFF";
+                    break;
+                case STATE_ON:
+                    return "ON";
+                    break;
+                case STATE_OVER:
+                    return "OVER";
+                    break;
+                default:
+                    return "UNKNOWN";
+            }            
+        }
+
+        String stepsData() {
+            if (isOff()) return "";
+            String s;            
+            for (int i = 0; i < stepCount; i++) {
+                if (i < currentStep) {
+                    s += "<div>step #" + String(i) + " is done</div>";
+                } else
+                if (i == currentStep) {
+                    s += "<div><strong>Step #" + String(i) + " is current</strong></div>";
+                } else {
+                    s += "<div>Step #" + String(i) + " is waiting</div>";
+                };
+            }
+            return s;
+        }
+
         String data() {
-            return "<div>isActive: " + String(isActive) + "<br>" +
-                "progress: " + String(currentStep) + " of " + String(stepCount) + "<br>" +
-                "button index: " + String(buttonIndex) +
-                "</div>";
+            return "<div><strong>GAME IS " + stateText() + "</strong><br>" +
+                String(min(currentStep, stepCount)) + " of " + String(stepCount) + "<br>" +
+                "Button index: " + String(buttonIndex) +
+                "</div>" + stepsData();
         }
 };
-
-Game game(10);

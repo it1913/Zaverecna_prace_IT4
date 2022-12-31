@@ -10,6 +10,7 @@ int self_id;
 
 AsyncWebServer server(80);
 AsyncWebSocket ws("/ws");
+Game game(10);
 
 int light(Button btn) {
   //digitalWrite(pin_LED, btn.state);
@@ -20,7 +21,6 @@ int light(Button btn) {
 
 void notifyClients() {
   ws.textAll(game.notifyText());
-  Serial.println("notifyClients: "+game.notifyText());
 }
 
 void OnDataSent(uint8_t *mac_addr, uint8_t sendStatus) {
@@ -98,6 +98,15 @@ void initWebSocket() {
 }
 
 /* Web sockets */
+
+void gameStateCallback(int value) {
+  //Pri kazde zmene hodnoty Game.state se zavola tento callback
+  notifyClients();
+}
+
+void initGame() {
+  game.setStateCallback(&gameStateCallback);
+}
 
 const char index_html[] PROGMEM = R"rawliteral(
 <!DOCTYPE HTML><html>
@@ -415,14 +424,17 @@ void setup()
   server.on("/startGame", HTTP_GET, [](AsyncWebServerRequest *request)
   {
       game.handleStart(request);
+      notifyClients();
   });
 
   server.on("/stopGame", HTTP_GET, [](AsyncWebServerRequest *request)
   {
       game.handleStop(request);
+      notifyClients();
   });
 
   initWebSocket();
+  initGame();
   server.begin();
 }
 
