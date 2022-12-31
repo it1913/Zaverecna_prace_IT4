@@ -49,13 +49,13 @@ void OnDataRecv(uint8_t * mac, uint8_t *incomingData, uint8_t len) {
    //button[index].playing = (recvData.response == RESP_I_WILL_PLAY);
   }
   light(button[index]);
-  if ((recvData.command == CMD_SWITCH_STATE) and (game.buttonIndex == index) and (recvData.state == LOW)) {
+  if ((recvData.command == CMD_SWITCH_STATE) and (game.isButtonIndex(index)) and (recvData.state == LOW)) {
     if (LOG_RECV) {
       Serial.println("End of waiting for press button #"+String(button[index].id));
     }
-    game.buttonIndex = NO_BUTTON_INDEX;
+    game.setButtonDown();
     recvData.command = CMD_UNDEFINED;
-    notifyClients();
+    //notifyClients();
   }
 }
 
@@ -128,7 +128,12 @@ const char index_html[] PROGMEM = R"rawliteral(
     input:checked+.slider:before {-webkit-transform: translateX(52px); -ms-transform: translateX(52px); transform: translateX(52px)}
     .row { display: flex; }
     .column { flex: 50vw; }
-    button { width: 30vw; }
+    button { width: 30vw; padding: 5px; margin: 5px; }
+    .data { width: 30vw; padding: 5px; margin: 5px; background-color: LightSkyBlue; }
+    .header { font-weight: bold; background-color: DodgerBlue; }
+    .current { font-weight: bold; background-color: Gold; }
+    .done { background-color: LightGrey; }
+    .waiting { }
   </style>
 </head>
 <body>

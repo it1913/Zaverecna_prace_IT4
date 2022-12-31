@@ -5,8 +5,6 @@
 #include <espnow.h>
 #include <common.h>
 
-const bool automaticPress = false;
-
 struct Device {
   DeviceAddress addr;
   int id;
@@ -97,9 +95,9 @@ void OnDataRecv(uint8_t * mac, uint8_t *incomingData, uint8_t len) {
   if((recvData.command == CMD_SWITCH_STATE) || (recvData.command == CMD_SWITCH_BY_GAME)){    
     Serial.printf("Received state %d and value=%d from device #%d, ",recvData.state,recvData.value,recvData.id);
     self.state = recvData.state;
-    self.value = recvData.value;
-    self.waiting = LOW;
+    self.value = recvData.value;    
     digitalWrite(pin_LED, self.state);    
+    self.waiting = LOW;
   } else
   if (recvData.command == CMD_WHO_IS_HERE) {
     answer("i_am_here",recvData.command,RESP_I_AM_HERE,WHO_IS_HERE_STATE);
@@ -109,7 +107,7 @@ void OnDataRecv(uint8_t * mac, uint8_t *incomingData, uint8_t len) {
  
 void OnDataSent(uint8_t *mac_addr, uint8_t sendStatus) {
   Serial.printf("Sent state %d and value=%d to device #%d, ",sendData.state,sendData.value,recv.id);
-  check(sendStatus,"Last Packet Send Status");
+  check(sendStatus,"Last Packet Send Status");  
 }
 
 void setup() {
@@ -213,14 +211,8 @@ const long interval = 5000;
 void loop(){
   if (digitalRead(pin_button)==HIGH && self.waiting==LOW)
   {
+    self.waiting = HIGH;
     press("manual");
-  } else
-  if (automaticPress && (self.id == slave_id)) 
-  {
-    unsigned long currentMillis = millis();
-    if (currentMillis - previousMillis >= interval) {
-      previousMillis = currentMillis;
-      press("slave automatic press");
-    }
+    delay(CLIENT_PRESS_DELAY);
   }
 }

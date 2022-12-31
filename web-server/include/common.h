@@ -23,6 +23,7 @@ struct Button
   bool playing; //tlacitko reagovalo na zpravu CMD_I_WILL_PLAY odpovedi RESP_I_WILL_PLAY
 };
 
+const int CLIENT_PRESS_DELAY = 300;
 const int NO_BUTTON_INDEX = -1;
 const int WHO_IS_HERE_STATE = LOW;
 const boolean LOG_RECV = false;

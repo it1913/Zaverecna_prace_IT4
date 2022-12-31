@@ -6,17 +6,58 @@ typedef std::function<void(int value)> StateCallback;
 
 class Game {
     private:
-        int state;
+        int _state;             //stav hry
+        int _buttonIndex;       //index aktualniho tlacitka        
+        int _prevButtonIndex;   //
+        int _stepCount;         //celkovy pocet kroku
+        int _stepDone;          //pocet splnenych kroku
+        bool _sameButtonIsAllowed;
+        
         StateCallback stateCallback;
+        int getButtonIndex() {
+            return _buttonIndex;
+        }
+        void setButtonIndex(int value) {
+            _buttonIndex = value;
+        }
+        int getStepCount() {
+            return _stepCount;
+        }
+        void setStepCount(int value) {
+            _stepCount = value;
+        }
+        int getStepDone() {
+            return _stepDone;
+        }
+        void setStepDone(int value) {
+            _stepDone = value;
+            _prevButtonIndex = _buttonIndex;
+            setButtonIndex(NO_BUTTON_INDEX);
+            Serial.println("step done: "+String(_stepDone));            
+        }
+        bool isState(int value) {
+            return (_state == value);
+        }
+        int getState() {
+            return _state;
+        }
         void setState(int value) { 
-            if (state != value) {
-                state = value; 
+            if (_state != value) {
+                _state = value;                 
+                if (_state != STATE_OVER) { 
+                    setButtonIndex(NO_BUTTON_INDEX);
+                    setStepDone(0);
+                }
+                _prevButtonIndex = NO_BUTTON_INDEX;
                 Serial.println("GAME IS " + stateText());
             }
-            if (stateCallback) stateCallback(state);
+            if (stateCallback) stateCallback(_state);
         }
         bool isValidButtonIndex(int index) {
-            return ((index>=0) && (index<button_count) && (button[index].enabled) && (index != buttonIndex));
+            return ((index>=0) && 
+                    (index<button_count) && 
+                    (button[index].enabled) && 
+                    (_sameButtonIsAllowed ||(index != _prevButtonIndex)));
             /*  Posledni podminka rika, ze dalsi musi byt jiny nez aktualni 
                 a je pouze docasna, nez se podari odstranit chybku v metode loop,
                 kde dochazi k preskovani kroku, pokus je nasledujici tlacitko stejne
@@ -41,81 +82,69 @@ class Game {
         }
         void testButtonIndex() {
             //Pomocna metoda, ktera slouzi k otestovani vyberu dalsiho tlacitka
-            for (int i = 0; i < stepCount; i++) {
-                int prevIndex = buttonIndex;
-                buttonIndex = nextButtonIndex();
-                Serial.println("go from "+String(prevIndex)+" to "+String(buttonIndex));                
+            for (int i = 0; i < getStepCount(); i++) {
+                int prevIndex = getButtonIndex();
+                setButtonIndex(nextButtonIndex());
+                Serial.println("go from "+String(prevIndex)+" to "+String(getButtonIndex()));                
             }
         }
-    public:        
+    public:      
+        bool isButtonIndex(int value) {
+            return (_buttonIndex == value);
+        }
+        void setButtonDown() {            
+            setStepDone(getStepDone()+1);
+            if (stateCallback) stateCallback(_state);
+        }
         bool isOff() {      //je hra stopnuta?
-            return (state == STATE_OFF);
+            return isState(STATE_OFF);
         }
         bool isActive() {   //je hra aktivni?
-            return (state == STATE_ON);
+            return isState(STATE_ON);
         }
         bool isOver() {     // hra skoncila?
             //test, zda uz neni konec + vraceni odpovidajici hodnoty
-            if (isActive() && (currentStep > stepCount)) {             
+            if (isActive() && (getStepDone() >= getStepCount())) {             
                 setState(STATE_OVER);            
             }
-            return (state == STATE_OVER);
+            return isState(STATE_OVER);
         }
-        int stepCount;      //celkovy pocet kroku
-        int currentStep;    //aktualni krok
-        int buttonIndex;    //index aktualniho tlacitka
 
         Game(int AStepCount) { 
-            buttonIndex = NO_BUTTON_INDEX;
-            setState(STATE_OFF);
-            stepCount = AStepCount;
-            currentStep = 0; 
+            _sameButtonIsAllowed = false;
+            setStepCount(AStepCount);
+            setState(STATE_OFF);            
         }; 
-
-        void printState() {
-            //Serial.println("IsActive: "+String(isActive));    
-            Serial.println("Waiting press button #"+String(buttonIndex)+", step "+String(currentStep)+" of "+String(stepCount));    
-            //Serial.println("Button index: "+String(buttonIndex));    
-        } 
 
         void stop() {
             //zastaveni/ukonceni hry
-            if (!isOff()){        
-                printState();
-                setState(STATE_OFF);        
-                currentStep = 0;
-            }
+            setState(STATE_OFF);   
+            testButtonIndex();     
         }
 
         void loop(){
             //aktualizacni metoda volana v loopu aplikace
             if (!isActive()) { return; };
-            if (buttonIndex > NO_BUTTON_INDEX) { return; };
-            currentStep++;
+            if (!isButtonIndex(NO_BUTTON_INDEX)) { return; };
             if (isOver()) { return; };
 
-            //urceni dalsiho tlacitka
+            //Urceni dalsiho tlacitka
             int index = nextButtonIndex();
-            Serial.println("Next  button index is "+String(index));
             if (index == NO_BUTTON_INDEX) {
                 //kdyz se nepodari urcit dalsi tlacitko, ukoncit hru
                 stop();
                 return;
             }
-            buttonIndex = index;    
+            setButtonIndex(index);    
 
             setButton(index, HIGH, CMD_SWITCH_BY_GAME);
             delay(10);
-            printState();    
         }
 
         void start(int AStepCount) {
             if (isActive()) { return; } 
-            stepCount = AStepCount;   
-            currentStep = 0;
-            buttonIndex = NO_BUTTON_INDEX;
+            setStepCount(AStepCount);   
             setState(STATE_ON);
-            printState();
         }
 
         void handleStart(AsyncWebServerRequest *request){
@@ -168,7 +197,7 @@ class Game {
         }
 
         String stateText() {
-            switch(state) {
+            switch(getState()) {
                 case STATE_OFF:
                     return "OFF";
                     break;
@@ -183,26 +212,33 @@ class Game {
             }            
         }
 
+        String stepData(int step) {
+            String s;
+            if ((step < getStepDone()) || isOver()) {
+                s = "done";
+            } else
+            if (step > getStepDone()) {
+                s = "waiting";
+            } else {
+                s = "current";
+            };
+            s = "<div class=\"data "+s+"\">Step #" + String(step+1) + " is " + s + "</div>";
+            return s;
+        }
+
         String stepsData() {
             if (isOff()) return "";
             String s;            
-            for (int i = 0; i < stepCount; i++) {
-                if (i < currentStep) {
-                    s += "<div>step #" + String(i) + " is done</div>";
-                } else
-                if (i == currentStep) {
-                    s += "<div><strong>Step #" + String(i) + " is current</strong></div>";
-                } else {
-                    s += "<div>Step #" + String(i) + " is waiting</div>";
-                };
+            for (int i = 0; i < getStepCount(); i++) {
+                s += stepData(i);
             }
             return s;
         }
 
         String data() {
-            return "<div><strong>GAME IS " + stateText() + "</strong><br>" +
-                String(min(currentStep, stepCount)) + " of " + String(stepCount) + "<br>" +
-                "Button index: " + String(buttonIndex) +
+            return "<div class=\"data header\">GAME IS " + stateText() + "<br>" +
+                String(_stepDone) + " of " + String(_stepCount) + "<br>" +
+                "Button index: " + String(_buttonIndex) +
                 "</div>" + stepsData();
         }
 };
