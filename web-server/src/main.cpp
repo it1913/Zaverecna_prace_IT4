@@ -99,13 +99,13 @@ void initWebSocket() {
 
 /* Web sockets */
 
-void gameStateCallback(int value) {
+void gameCallback() {
   //Pri kazde zmene hodnoty Game.state se zavola tento callback
   notifyClients();
 }
 
 void initGame() {
-  game.setStateCallback(&gameStateCallback);
+  game.setClientCallback(&gameCallback);
 }
 
 const char index_html[] PROGMEM = R"rawliteral(
@@ -413,6 +413,7 @@ void setup()
 
   server.on("/whoIsHere", HTTP_GET, [](AsyncWebServerRequest *request)
   {
+    game.stop();
     for(int i = 0; i< button_count; i++){
       button[i].state = LOW;
       button[i].enabled = DISABLED;
@@ -423,7 +424,7 @@ void setup()
       sendData.response = RESP_I_AM_HERE;
       esp_now_send(button[i].address.bytes, (uint8_t *) &sendData, sizeof(sendData));
     }
-    request->send(200, "text/plain", "OK");
+    request->send(200, "text/plain", "OK");    
   });
 
   server.on("/startGame", HTTP_GET, [](AsyncWebServerRequest *request)

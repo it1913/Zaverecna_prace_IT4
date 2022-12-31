@@ -2,7 +2,7 @@ const int STATE_OFF = 0;
 const int STATE_ON = 1;
 const int STATE_OVER = 2;
 
-typedef std::function<void(int value)> StateCallback;
+typedef std::function<void()> ClientCallback;
 
 class Game {
     private:
@@ -11,48 +11,92 @@ class Game {
         int _prevButtonIndex;   //
         int _stepCount;         //celkovy pocet kroku
         int _stepDone;          //pocet splnenych kroku
+        bool _modified;         //od posledniho callbacku doslo ke zmene
         bool _sameButtonIsAllowed;
+        uint32_t _startTime;
+        uint32_t _stopTime;
         
-        StateCallback stateCallback;
+        ClientCallback _clientCallback;
+
         int getButtonIndex() {
             return _buttonIndex;
         }
+
         void setButtonIndex(int value) {
             _buttonIndex = value;
         }
+
         int getStepCount() {
             return _stepCount;
         }
+
         void setStepCount(int value) {
             _stepCount = value;
         }
+
         int getStepDone() {
             return _stepDone;
         }
+
         void setStepDone(int value) {
+            if (_stepDone == value) return;
             _stepDone = value;
+            _modified = true;
             _prevButtonIndex = _buttonIndex;
             setButtonIndex(NO_BUTTON_INDEX);
-            Serial.println("step done: "+String(_stepDone));            
+            Serial.println("step done: "+String(_stepDone));                        
+            if (isOver() || _stepDone) clientCallback();          
         }
+
         bool isState(int value) {
             return (_state == value);
         }
+
         int getState() {
             return _state;
         }
+
         void setState(int value) { 
             if (_state != value) {
-                _state = value;                 
-                if (_state != STATE_OVER) { 
-                    setButtonIndex(NO_BUTTON_INDEX);
-                    setStepDone(0);
-                }
-                _prevButtonIndex = NO_BUTTON_INDEX;
-                Serial.println("GAME IS " + stateText());
+                _state = value;
+                _modified = true; 
+                switch (_state) {
+                    case STATE_OVER:
+                        _stopTime = millis();
+                        break;
+                    case STATE_ON:
+                        _startTime = millis();
+                        setButtonIndex(NO_BUTTON_INDEX);
+                        setStepDone(0);
+                        break;
+                    case STATE_OFF:
+                        _stopTime = millis();                        
+                        setButtonIndex(NO_BUTTON_INDEX);
+                        setStepDone(0);
+                        break;
+                }        
+                _prevButtonIndex = NO_BUTTON_INDEX;        
+                Serial.println("GAME IS " + stateText());                
+                clientCallback();
             }
-            if (stateCallback) stateCallback(_state);
         }
+
+        String stateText() {
+            switch(getState()) {
+                case STATE_OFF:
+                    return "OFF";
+                    break;
+                case STATE_ON:
+                    return "ON";
+                    break;
+                case STATE_OVER:
+                    return "OVER";
+                    break;
+                default:
+                    return "UNKNOWN";
+            }            
+        }
+
         bool isValidButtonIndex(int index) {
             return ((index>=0) && 
                     (index<button_count) && 
@@ -64,6 +108,7 @@ class Game {
                 jako aktualni.
             */
         }
+
         int nextButtonIndex() {
             int index = rand() % button_count;
             if (isValidButtonIndex(index)) return index;
@@ -80,6 +125,7 @@ class Game {
             };
             return NO_BUTTON_INDEX;
         }
+
         void testButtonIndex() {
             //Pomocna metoda, ktera slouzi k otestovani vyberu dalsiho tlacitka
             for (int i = 0; i < getStepCount(); i++) {
@@ -92,16 +138,19 @@ class Game {
         bool isButtonIndex(int value) {
             return (_buttonIndex == value);
         }
+
         void setButtonDown() {            
-            setStepDone(getStepDone()+1);
-            if (stateCallback) stateCallback(_state);
+            setStepDone(getStepDone()+1);              
         }
-        bool isOff() {      //je hra stopnuta?
+
+        bool isOff() {      //je hra zastavena/neaktivni?
             return isState(STATE_OFF);
         }
+
         bool isActive() {   //je hra aktivni?
             return isState(STATE_ON);
         }
+
         bool isOver() {     // hra skoncila?
             //test, zda uz neni konec + vraceni odpovidajici hodnoty
             if (isActive() && (getStepDone() >= getStepCount())) {             
@@ -110,16 +159,31 @@ class Game {
             return isState(STATE_OVER);
         }
 
+        String getTimeText() {            
+            if (isOver()) {
+                return stopwatch(_stopTime - _startTime);
+            } else
+            if (isActive()) {   
+                return stopwatch(millis() - _startTime);
+            }
+            return "";
+        }
+
         Game(int AStepCount) { 
             _sameButtonIsAllowed = false;
             setStepCount(AStepCount);
             setState(STATE_OFF);            
-        }; 
+        } 
+
+        void start(int AStepCount) {
+            if (isActive()) { return; } 
+            setStepCount(AStepCount);
+            setState(STATE_ON);
+        }
 
         void stop() {
             //zastaveni/ukonceni hry
             setState(STATE_OFF);   
-            testButtonIndex();     
         }
 
         void loop(){
@@ -139,12 +203,6 @@ class Game {
 
             setButton(index, HIGH, CMD_SWITCH_BY_GAME);
             delay(10);
-        }
-
-        void start(int AStepCount) {
-            if (isActive()) { return; } 
-            setStepCount(AStepCount);   
-            setState(STATE_ON);
         }
 
         void handleStart(AsyncWebServerRequest *request){
@@ -182,8 +240,15 @@ class Game {
             //digitalWrite(pin_LED, btn->state);
         }
 
-        void setStateCallback(StateCallback value) {
-            stateCallback = value;
+        void setClientCallback(ClientCallback value) {
+            _clientCallback = value;
+        }
+
+        void clientCallback() {            
+            if (_clientCallback && _modified) {
+                _modified = false;
+                _clientCallback();
+            }
         }
 
         String notifyText() {
@@ -194,22 +259,6 @@ class Game {
         int handleWebSocketMessage(void *arg, uint8_t *data, size_t len) {
             //obsluha zprav od klientů
             return 0;
-        }
-
-        String stateText() {
-            switch(getState()) {
-                case STATE_OFF:
-                    return "OFF";
-                    break;
-                case STATE_ON:
-                    return "ON";
-                    break;
-                case STATE_OVER:
-                    return "OVER";
-                    break;
-                default:
-                    return "UNKNOWN";
-            }            
         }
 
         String stepData(int step) {
@@ -238,7 +287,8 @@ class Game {
         String data() {
             return "<div class=\"data header\">GAME IS " + stateText() + "<br>" +
                 String(_stepDone) + " of " + String(_stepCount) + "<br>" +
-                "Button index: " + String(_buttonIndex) +
+                "Time: " + getTimeText() + " s<br>" +
+                "Button index: " + String(_buttonIndex) +                
                 "</div>" + stepsData();
         }
 };
