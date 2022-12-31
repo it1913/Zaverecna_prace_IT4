@@ -4,6 +4,15 @@ const int STATE_OVER = 2;
 
 typedef std::function<void()> ClientCallback;
 
+struct Step
+{
+	int buttonIndex;
+	bool done;
+    uint32_t time;
+};
+
+typedef struct Step Step;
+
 class Game {
     private:
         int _state;             //stav hry
@@ -15,6 +24,7 @@ class Game {
         bool _sameButtonIsAllowed;
         uint32_t _startTime;
         uint32_t _stopTime;
+        Step* _step;
         
         ClientCallback _clientCallback;
 
@@ -32,19 +42,35 @@ class Game {
 
         void setStepCount(int value) {
             _stepCount = value;
+            delete[] _step;
+            _step = new Step[_stepCount];
+            for (int i = 0; i < _stepCount; i++) {
+                _step[i].buttonIndex = NO_BUTTON_INDEX;
+                _step[i].done = false;
+                _step[i].time = 0;
+            }
         }
 
         int getStepDone() {
             return _stepDone;
         }
 
-        void setStepDone(int value) {
-            if (_stepDone == value) return;
-            _stepDone = value;
+        void clearStepDone() {
+            _stepDone = 0;
+            _prevButtonIndex = NO_BUTTON_INDEX;
+            setButtonIndex(NO_BUTTON_INDEX);
+        }
+
+        void incStepDone() {
+            int index = _stepDone;
+            _stepDone++;
             _modified = true;
             _prevButtonIndex = _buttonIndex;
+            _step[index].buttonIndex = _buttonIndex;
+            _step[index].done = true;
+            _step[index].time = millis() - _startTime;            
+            Serial.println("Step #"+String(_stepDone)+" done in "+stopwatch(_step[index].time)+" s"); 
             setButtonIndex(NO_BUTTON_INDEX);
-            Serial.println("step done: "+String(_stepDone));                        
             if (isOver() || _stepDone) clientCallback();          
         }
 
@@ -66,13 +92,11 @@ class Game {
                         break;
                     case STATE_ON:
                         _startTime = millis();
-                        setButtonIndex(NO_BUTTON_INDEX);
-                        setStepDone(0);
+                        clearStepDone();
                         break;
                     case STATE_OFF:
                         _stopTime = millis();                        
-                        setButtonIndex(NO_BUTTON_INDEX);
-                        setStepDone(0);
+                        clearStepDone();
                         break;
                 }        
                 _prevButtonIndex = NO_BUTTON_INDEX;        
@@ -128,10 +152,11 @@ class Game {
 
         void testButtonIndex() {
             //Pomocna metoda, ktera slouzi k otestovani vyberu dalsiho tlacitka
+            _prevButtonIndex = NO_BUTTON_INDEX;
             for (int i = 0; i < getStepCount(); i++) {
-                int prevIndex = getButtonIndex();
                 setButtonIndex(nextButtonIndex());
-                Serial.println("go from "+String(prevIndex)+" to "+String(getButtonIndex()));                
+                Serial.println("go from "+String(_prevButtonIndex)+" to "+String(getButtonIndex()));                
+                _prevButtonIndex = getButtonIndex();
             }
         }
     public:      
@@ -140,7 +165,7 @@ class Game {
         }
 
         void setButtonDown() {            
-            setStepDone(getStepDone()+1);              
+            incStepDone();              
         }
 
         bool isOff() {      //je hra zastavena/neaktivni?
@@ -174,6 +199,9 @@ class Game {
             setStepCount(AStepCount);
             setState(STATE_OFF);            
         } 
+        ~Game() {
+            delete[] _step;
+        }        
 
         void start(int AStepCount) {
             if (isActive()) { return; } 
@@ -184,6 +212,20 @@ class Game {
         void stop() {
             //zastaveni/ukonceni hry
             setState(STATE_OFF);   
+        }
+
+        void init() {
+            SendData data;
+            for(int i = 0; i< button_count; i++){
+                button[i].state = LOW;
+                button[i].enabled = DISABLED;
+                data.state = WHO_IS_HERE_STATE;
+                data.id = button[i].id;
+                data.value = i;
+                data.command = CMD_WHO_IS_HERE;
+                data.response = RESP_I_AM_HERE;
+                esp_now_send(button[i].address.bytes, (uint8_t *) &data, sizeof(data));
+            }
         }
 
         void loop(){
@@ -216,6 +258,13 @@ class Game {
 
         void handleStop(AsyncWebServerRequest *request){
             stop();
+            init();
+            request->send(200, "text/plain", "OK");
+        }
+
+        void handleInit(AsyncWebServerRequest *request){
+            stop();
+            init();
             request->send(200, "text/plain", "OK");
         }
 
@@ -257,21 +306,25 @@ class Game {
         }
 
         int handleWebSocketMessage(void *arg, uint8_t *data, size_t len) {
-            //obsluha zprav od klientů
+            //obsluha zprav od klientů a pokud dojde ke zmene stavu, 
+            //tak se zavola callback na promitnuti zpet.
+            clientCallback();
             return 0;
         }
 
         String stepData(int step) {
             String s;
+            String t = "";
             if ((step < getStepDone()) || isOver()) {
                 s = "done";
+                if (_step[step].done) t = " in " + stopwatch(_step[step].time)+" s";
             } else
             if (step > getStepDone()) {
                 s = "waiting";
             } else {
                 s = "current";
             };
-            s = "<div class=\"data "+s+"\">Step #" + String(step+1) + " is " + s + "</div>";
+            s = "<div class=\"data "+s+"\">Step #" + String(step+1) + " is " + s + t + "</div>";
             return s;
         }
 
@@ -287,8 +340,7 @@ class Game {
         String data() {
             return "<div class=\"data header\">GAME IS " + stateText() + "<br>" +
                 String(_stepDone) + " of " + String(_stepCount) + "<br>" +
-                "Time: " + getTimeText() + " s<br>" +
-                "Button index: " + String(_buttonIndex) +                
+                "<span id=\"timewatch\">" + getTimeText() + "</span><br>" +
                 "</div>" + stepsData();
         }
 };

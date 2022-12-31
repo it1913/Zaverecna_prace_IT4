@@ -90,7 +90,7 @@ String time2str(uint32_t millis) {
 String stopwatch(uint32_t millis) {
   int secs = millis/1000;
   int msec = millis%1000;
-  char s[21];
+  char s[10];
   sprintf(s,"%3d,%01d",secs,msec/100);
   return s;
 }

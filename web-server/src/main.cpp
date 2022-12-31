@@ -55,7 +55,6 @@ void OnDataRecv(uint8_t * mac, uint8_t *incomingData, uint8_t len) {
     }
     game.setButtonDown();
     recvData.command = CMD_UNDEFINED;
-    //notifyClients();
   }
 }
 
@@ -68,8 +67,8 @@ void handleWebSocketMessage(void *arg, uint8_t *data, size_t len) {
   AwsFrameInfo *info = (AwsFrameInfo*)arg;
   if (info->final && info->index == 0 && info->len == len && info->opcode == WS_TEXT) {
     data[len] = 0;
-    if (game.handleWebSocketMessage(arg, data, len) == 0) {
-      notifyClients();
+    if (game.handleWebSocketMessage(arg, data, len) == 0) {      
+      //zatim nic
     }
   }
 }
@@ -134,6 +133,7 @@ const char index_html[] PROGMEM = R"rawliteral(
     .current { font-weight: bold; background-color: Gold; }
     .done { background-color: LightGrey; }
     .waiting { }
+    #timewatch { font-size: 2em; }
   </style>
 </head>
 <body>
@@ -145,17 +145,31 @@ const char index_html[] PROGMEM = R"rawliteral(
       <div><button type="button" onclick="startGame()">START</button></div>
       <div><button type="button" onclick="stopGame()">STOP</button></div>
       <div>
-        <label for="stepCount">Step count:</label>
-        <input type="number" id="stepCount" min="1" max="100" value="10">
+        <div><label for="games">Choose a game:</label></div>
+        <div>
+          <select id="games">
+            <option value="1">Exercise #1</option>
+            <option value="2">Exercise #2</option>
+            <option value="3">Exercise #3</option>
+          </select>      
+        </div>
       </div>
       <div>
-        <label for="cars">Choose a player:</label>
-        <select id="players">
-          <option value="martin">Martin</option>
-          <option value="petr">Petr</option>
-          <option value="pavel">Pavel</option>
-          <option value="josef">Josef</option>
-        </select>      
+        <div><label for="stepCount">Step count:</label></div>
+        <div>
+          <input type="number" id="stepCount" min="1" max="100" value="10">
+        </div>
+      </div>
+      <div>
+        <div><label for="players">Choose a player:</label></div>
+        <div>
+          <select id="players">
+            <option value="1">Martin</option>
+            <option value="2">Petr</option>
+            <option value="3">Pavel</option>
+            <option value="4">Josef</option>
+          </select>      
+        </div>
       </div>
     </div>
     <div class="column" id="game">
@@ -304,7 +318,7 @@ String processor(const String &var)
       String id_output = "output" + String(button[i].id);
       String disabled = "";
       if (!button[i].enabled) { disabled = " disabled"; };
-      buttons += "  <div><h4>Output State LED #" + String(button[i].id) + ": <span id=\"" + id_outputState + "\"></span></h4>\n" +
+      buttons += "  <div><h4>Button #" + String(button[i].id) + ": <span id=\"" + id_outputState + "\"></span></h4>\n" +
                  "  <label class=\"switch\"><input type=\"checkbox\" onchange=\"toggleCheckbox(this)\" id=\"" + id_output + "\" " + outputStateValue + disabled + "><span class=\"slider\"></span></label></div>";
     }
     return buttons;
@@ -413,30 +427,29 @@ void setup()
 
   server.on("/whoIsHere", HTTP_GET, [](AsyncWebServerRequest *request)
   {
-    game.stop();
-    for(int i = 0; i< button_count; i++){
-      button[i].state = LOW;
-      button[i].enabled = DISABLED;
-      sendData.state = WHO_IS_HERE_STATE;
-      sendData.id = button[i].id;
-      sendData.value = i;
-      sendData.command = CMD_WHO_IS_HERE;
-      sendData.response = RESP_I_AM_HERE;
-      esp_now_send(button[i].address.bytes, (uint8_t *) &sendData, sizeof(sendData));
-    }
-    request->send(200, "text/plain", "OK");    
+    game.handleInit(request);
+    // game.stop();
+    // for(int i = 0; i< button_count; i++){
+    //   button[i].state = LOW;
+    //   button[i].enabled = DISABLED;
+    //   sendData.state = WHO_IS_HERE_STATE;
+    //   sendData.id = button[i].id;
+    //   sendData.value = i;
+    //   sendData.command = CMD_WHO_IS_HERE;
+    //   sendData.response = RESP_I_AM_HERE;
+    //   esp_now_send(button[i].address.bytes, (uint8_t *) &sendData, sizeof(sendData));
+    // }
+    // request->send(200, "text/plain", "OK"); 
   });
 
   server.on("/startGame", HTTP_GET, [](AsyncWebServerRequest *request)
   {
       game.handleStart(request);
-      notifyClients();
   });
 
   server.on("/stopGame", HTTP_GET, [](AsyncWebServerRequest *request)
   {
       game.handleStop(request);
-      notifyClients();
   });
 
   initWebSocket();
