@@ -3,7 +3,8 @@
 #include <Arduino.h>
 #include <ESP8266WiFi.h>
 #include <espnow.h>
-#include <common.h>
+#include "../../web-server/include/common.h"
+
 
 struct Device {
   DeviceAddress addr;
