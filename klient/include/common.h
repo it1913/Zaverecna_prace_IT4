@@ -1,5 +1,5 @@
 const char *WIFI_SSID = "Lego3";
-const char *WIFI_PASSWORD = "";
+const char *WIFI_PASSWORD = "AdelaMartinPetraIvo";
 
 struct Address {
   uint8_t bytes[6];

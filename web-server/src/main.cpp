@@ -1,9 +1,11 @@
 #include <ESP8266WiFi.h>
 #include <ESPAsyncTCP.h>
 #include <ESPAsyncWebServer.h>
+#include <ESP8266HTTPClient.h>
 #include <espnow.h>
 #include <common.h>
 #include <classes.h>
+#include <db.h>
 #include <game.h>
 
 int self_id;
@@ -105,12 +107,14 @@ void gameCallback() {
 
 void initGame() {
   game.setClientCallback(&gameCallback);
+  game.load();
 }
 
 const char index_html[] PROGMEM = R"rawliteral(
 <!DOCTYPE HTML><html>
 <head>
-  <title>ESP Output Control Web Server</title>
+  <title>%TITLE%</title>
+  <meta http-equiv="content-type" content="text/html; charset=UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <style>
     html {font-family: Segoe UI; display: inline-block; text-align: center;}
@@ -137,21 +141,25 @@ const char index_html[] PROGMEM = R"rawliteral(
   </style>
 </head>
 <body>
-  <h2>ESP Output Control Web Server</h2>
+  <h2>%TITLE%</h2>
   <div class="row">
     <div class="column">
-%BUTTONPLACEHOLDER%
-      <div><button type="button" onclick="whoIsHere()">INIT</button></div>
+%BUTTON%
+      <div><button type="button" onclick="initGame()">INIT</button></div>
       <div><button type="button" onclick="startGame()">START</button></div>
       <div><button type="button" onclick="stopGame()">STOP</button></div>
       <div>
-        <div><label for="games">Choose a game:</label></div>
+        <div><label for="exerciseId">Choose a exercise:</label></div>
         <div>
-          <select id="games">
-            <option value="1">Exercise #1</option>
-            <option value="2">Exercise #2</option>
-            <option value="3">Exercise #3</option>
-          </select>      
+          <select id="exerciseId">
+            %EXERCISE%
+          </select>
+        </div>
+      </div>
+      <div>
+        <div><label for="sessionId">Session:</label></div>
+        <div>
+          <input type="number" id="sessionId" value="0">
         </div>
       </div>
       <div>
@@ -161,19 +169,16 @@ const char index_html[] PROGMEM = R"rawliteral(
         </div>
       </div>
       <div>
-        <div><label for="players">Choose a player:</label></div>
+        <div><label for="participantId">Choose a player:</label></div>
         <div>
-          <select id="players">
-            <option value="1">Martin</option>
-            <option value="2">Petr</option>
-            <option value="3">Pavel</option>
-            <option value="4">Josef</option>
+          <select id="participantId">
+            %PARTICIPANT%
           </select>      
         </div>
       </div>
     </div>
     <div class="column" id="game">
-%GAMEDATAHOLDER%    
+%GAMEDATA%    
     </div>
   </div>
 <script>
@@ -235,7 +240,7 @@ function toggleCheckbox(element) {
   //readState();
 }
 
-function whoIsHere(element){
+function initGame(element){
   var xhr = new XMLHttpRequest();
   xhr.onreadystatechange = function() {
     if (this.readyState == 4 && this.status == 200) {
@@ -251,18 +256,21 @@ function whoIsHere(element){
       });
     }
   };
-  xhr.open("GET", "/whoIsHere", true);
+  xhr.open("GET", "/init", true);
   xhr.send();
 }
 
 function startGame(element){ 
-  let stepCount = document.getElementById("stepCount").value;
+  let sc = document.getElementById("stepCount").value;
+  let ei = document.getElementById("exerciseId").value;
+  let si = document.getElementById("sessionId").value;
+  let pi = document.getElementById("participantId").value;
   var xhr = new XMLHttpRequest();
   xhr.onreadystatechange = function() {
     if (this.readyState == 4 && this.status == 200) {
     }
   };
-  xhr.open("GET", "/startGame?stepCount="+stepCount, true);
+  xhr.open("GET", `/startGame?stepCount=${sc}&exerciseId=${ei}&sessionId=${si}&participantId=${pi}`, true);
   xhr.send();  
 }
 
@@ -308,8 +316,10 @@ int32_t getWiFiChannel(const char *ssid) {
 
 String processor(const String &var)
 {
-  if (var == "BUTTONPLACEHOLDER")
-  {
+  if (var == "TITLE") {
+    return "LightCone";
+  } else
+  if (var == "BUTTON") {
     String buttons = "";
     for (int i = 0; i < button_count; i++)
     {
@@ -323,8 +333,14 @@ String processor(const String &var)
     }
     return buttons;
   } else
-  if (var == "GAMEDATAHOLDER") {
+  if (var == "GAMEDATA") {
     return game.data();
+  } else
+  if (var == "EXERCISE") {
+    return game.getExerciseList();
+  } else
+  if (var == "PARTICIPANT") {
+    return game.getParticipantList();
   }
   return String("");
 }
@@ -425,7 +441,7 @@ void setup()
       request->send(200, "text/plain", message.c_str());
     });
 
-  server.on("/whoIsHere", HTTP_GET, [](AsyncWebServerRequest *request)
+  server.on("/init", HTTP_GET, [](AsyncWebServerRequest *request)
   {
     game.handleInit(request);
     // game.stop();

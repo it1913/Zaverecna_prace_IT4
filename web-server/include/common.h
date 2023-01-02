@@ -1,5 +1,5 @@
 const char *WIFI_SSID = "Lego3";
-const char *WIFI_PASSWORD = "";
+const char *WIFI_PASSWORD = "AdelaMartinPetraIvo";
 
 struct Address {
   uint8_t bytes[6];
@@ -91,7 +91,7 @@ String stopwatch(uint32_t millis) {
   int secs = millis/1000;
   int msec = millis%1000;
   char s[10];
-  sprintf(s,"%3d,%01d",secs,msec/100);
+  sprintf(s,"%01d.%01d",secs,msec/100);
   return s;
 }
 
