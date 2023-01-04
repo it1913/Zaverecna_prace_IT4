@@ -2,6 +2,7 @@
 #include <ESPAsyncTCP.h>
 #include <ESPAsyncWebServer.h>
 #include <ESP8266HTTPClient.h>
+#include <ESP8266mDNS.h>
 #include <espnow.h>
 #include <common.h>
 #include <db.h>
@@ -107,6 +108,12 @@ void gameCallback() {
 void initGame() {
   game.setClientCallback(&gameCallback);
   game.load();
+}
+void initMDNS(String name) {
+  if (!MDNS.begin(name)) {
+    Serial.println("Error setting up MDNS responder!");
+  }
+  Serial.println("mDNS responder started: "+name);
 }
 
 const char index_html[] PROGMEM = R"rawliteral(
@@ -480,11 +487,17 @@ void setup()
 
   initWebSocket();
   initGame();
+  initMDNS("lightcone");
+
   server.begin();
+
+  // Add service to MDNS-SD
+  MDNS.addService("http", "tcp", 80);
 }
 
 void loop()
 {
+  MDNS.update();
   ws.cleanupClients();
   game.loop();
 }
