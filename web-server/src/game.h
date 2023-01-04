@@ -221,6 +221,7 @@ class Game {
 
         Game(int AStepCount) { 
             _sameButtonIsAllowed = false;
+            _step = nullptr;
             setStepCount(AStepCount);
             setState(STATE_OFF);            
         } 

@@ -4,7 +4,6 @@
 #include <ESP8266HTTPClient.h>
 #include <espnow.h>
 #include <common.h>
-#include <classes.h>
 #include <db.h>
 #include <game.h>
 
@@ -131,7 +130,18 @@ const char index_html[] PROGMEM = R"rawliteral(
     input:checked+.slider:before {-webkit-transform: translateX(52px); -ms-transform: translateX(52px); transform: translateX(52px)}
     .row { display: flex; }
     .column { flex: 50vw; }
-    button { width: 30vw; padding: 5px; margin: 5px; }
+    button { 
+      width: 30vw; 
+      margin: 5px; 
+      background-color: #4CAF50; /* Green */
+      border: none;
+      color: white;
+      padding: 15px 32px;
+      text-align: center;
+      text-decoration: none;
+      display: inline-block;
+      font-size: 16px;
+    }
     .data { width: 30vw; padding: 5px; margin: 5px; background-color: LightSkyBlue; }
     .header { font-weight: bold; background-color: DodgerBlue; }
     .current { font-weight: bold; background-color: Gold; }
