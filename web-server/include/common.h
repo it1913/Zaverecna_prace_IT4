@@ -7,10 +7,13 @@ struct Address {
 
 typedef struct Address DeviceAddress;
 
-DeviceAddress mac_0 = {0xAC, 0x0B, 0xFB, 0xD9, 0x9A, 0x50}; //server
+//AC:0B:FB:D9:9A:50
+DeviceAddress mac_0 = {0xAC, 0x0B, 0xFB, 0xD9, 0x95, 0x58}; //server
 DeviceAddress mac_1 = {0x68, 0xC6, 0x3A, 0xA4, 0xC9, 0x60};
-DeviceAddress mac_2 = {0xAC, 0x0B, 0xFB, 0xD9, 0x95, 0x58};
+DeviceAddress mac_2 = {0xAC, 0x0B, 0xFB, 0xD9, 0x9A, 0x50};
 DeviceAddress mac_3 = {0xAC, 0x0B, 0xFB, 0xDC, 0x91, 0x79};
+DeviceAddress mac_4 = {0xC8, 0xC9, 0xA3, 0x0B, 0xEC, 0xA4};
+DeviceAddress mac_5 = {0xAC, 0x0B, 0xFB, 0xD9, 0xFA, 0x37};
 
 DeviceAddress mac_server = mac_0;
 
@@ -40,7 +43,6 @@ const int CMD_WHO_WILL_PLAY = 2;
 const int CMD_SWITCH_STATE = 3;
 const int CMD_SWITCH_BY_GAME = 4;
 
-const int button_count = 3;
 const char pin_LED = D6;
 const char pin_button = D1;
 
@@ -50,10 +52,13 @@ const int ENABLED = true;
 const int INACTIVE = false;
 const int ACTIVE = true;
 
+const int button_count = 5;
 Button button[button_count] = {
     {1, LOW, mac_1, DISABLED, INACTIVE},
     {2, LOW, mac_2, DISABLED, INACTIVE},
-    {3, LOW, mac_3, DISABLED, INACTIVE}
+    {3, LOW, mac_3, DISABLED, INACTIVE},
+    {4, LOW, mac_4, DISABLED, INACTIVE},
+    {5, LOW, mac_5, DISABLED, INACTIVE}
 };
 
 struct Message {

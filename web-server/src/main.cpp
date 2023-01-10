@@ -6,7 +6,8 @@
 #include <espnow.h>
 #include <common.h>
 #include <db.h>
-#include <game.h>
+//#include <game.h>
+#include <stopwatch.h>
 
 int self_id;
 
@@ -199,6 +200,22 @@ const char index_html[] PROGMEM = R"rawliteral(
     </div>
   </div>
 <script>
+  let startAudio = new Audio("http://www.kavala.cz/martin/lightcone/start.mp3");
+  startAudio.preload="auto";
+  let stepAudio = new Audio("http://www.kavala.cz/martin/lightcone/step.mp3");
+  stepAudio.preload="auto";
+  let overAudio = new Audio("http://www.kavala.cz/martin/lightcone/over.mp3");
+  overAudio.preload="auto";
+  let stopAudio = new Audio("http://www.kavala.cz/martin/lightcone/stop.mp3");
+  stopAudio.preload="auto";
+
+
+  function playSound(audioObj, currentTime){
+      let audio = audioObj.cloneNode();
+      audio.currentTime = currentTime;
+      audio.play();
+  }
+
   var gateway = `ws://${window.location.hostname}/ws`;
   var websocket;
   window.addEventListener('load', onLoad);
@@ -220,6 +237,7 @@ const char index_html[] PROGMEM = R"rawliteral(
     let el = document.getElementById('game');
     if (el) {
       el.innerHTML = event.data;
+      playSound(stepAudio, 0.3);
     }
   }        
   function onLoad(event) {
@@ -289,6 +307,7 @@ function startGame(element){
   };
   xhr.open("GET", `/startGame?stepCount=${sc}&exerciseId=${ei}&sessionId=${si}&participantId=${pi}`, true);
   xhr.send();  
+  playSound(startAudio, 0.3);
 }
 
 function stopGame(element){  
@@ -299,6 +318,7 @@ function stopGame(element){
   };
   xhr.open("GET", "/stopGame", true);
   xhr.send();  
+  playSound(stopAudio, 0.3);
 }
 
 </script>

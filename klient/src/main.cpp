@@ -111,6 +111,19 @@ void OnDataSent(uint8_t *mac_addr, uint8_t sendStatus) {
   check(sendStatus,"Last Packet Send Status");  
 }
 
+bool isDevice(String selfAddress, int id, DeviceAddress addr) {
+  if (selfAddress == mac2str(addr)) {
+    slave_id = id;
+    self.addr = addr;
+    self.id = slave_id;
+    recv.addr = mac_server;
+    recv.id = server_id;
+    return true;
+  } else {
+    return false;
+  }
+} 
+
 void setup() {
 
   pinMode(pin_button,INPUT_PULLUP);
@@ -138,38 +151,21 @@ void setup() {
   WiFi.printDiag(Serial); 
   wifi_promiscuous_enable(true);
   wifi_set_channel(wifi_channel);
-  wifi_promiscuous_enable(false);
-  //esp_wifi_set_promiscuous(true);
-  //esp_wifi_set_channel(channel, WIFI_SECOND_CHAN_NONE);
-  //esp_wifi_set_promiscuous(false);
+  wifi_promiscuous_enable(false);  
   WiFi.printDiag(Serial); 
 
-  if (mac == mac2str(mac_1)) {
-    slave_id = 1;
-    self.addr = mac_1;
-    self.id = slave_id;
-    recv.addr = mac_server;
-    recv.id = server_id;
-  } else
-    if (mac == mac2str(mac_2)) {
-    slave_id = 2;
-    self.addr = mac_2;
-    self.id = slave_id;
-    recv.addr = mac_server;
-    recv.id = server_id;
-  } else
-if (mac == mac2str(mac_3)) {
-    slave_id = 3;
-    self.addr = mac_3;
-    self.id = slave_id;
-    recv.addr = mac_server;
-    recv.id = server_id;
+  bool knownDevice = false;
+  for (int i = 0; i < button_count; i++) {
+    knownDevice = knownDevice || isDevice(mac, button[i].id, button[i].address); 
+  }
+
+  if (knownDevice) {
+    Serial.println("Known device at address "+mac);  
   } else
   if (mac == mac2str(mac_server)) {
     Serial.println("I am server at address "+mac);
     return;
-  } else
-  {
+  } else {
     Serial.println("Unknown device at address "+mac);
     return;
   }
@@ -206,7 +202,6 @@ if (mac == mac2str(mac_3)) {
   flicker(10, 100);
 }
 
-unsigned long previousMillis = 0;
 const long interval = 5000; 
 
 void loop(){

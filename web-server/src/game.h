@@ -21,7 +21,7 @@ struct Step
 typedef struct Step Step;
 
 class Game {
-    private:
+    protected:
         ExerciseId _exerciseId;
         SessionId _sessionId;
         ParticipantId _participantId;
@@ -37,6 +37,7 @@ class Game {
         bool _modified;         //od posledniho callbacku doslo ke zmene stavu
         bool _postData;
         bool _sameButtonIsAllowed;
+        bool _firstButtonIsRandom;
         uint32_t _startTime;
         uint32_t _stopTime;
         Step* _step;
@@ -146,6 +147,10 @@ class Game {
             }            
         }
 
+        bool getFirstButoonIsRandom () {
+            return _firstButtonIsRandom;
+        }
+
         bool isValidButtonIndex(int index) {
             return ((index>=0) && 
                     (index<button_count) && 
@@ -159,7 +164,12 @@ class Game {
         }
 
         int nextButtonIndex() {
-            int index = rand() % button_count;
+            int index;
+            if (!getFirstButoonIsRandom() && (getStepDone() == 0)) {
+                index = 0;
+            } else {
+                index = rand() % button_count;
+            };
             if (isValidButtonIndex(index)) return index;
             int i;
             i = index-1;
@@ -221,6 +231,7 @@ class Game {
 
         Game(int AStepCount) { 
             _sameButtonIsAllowed = false;
+            _firstButtonIsRandom = false;
             _step = nullptr;
             setStepCount(AStepCount);
             setState(STATE_OFF);            
