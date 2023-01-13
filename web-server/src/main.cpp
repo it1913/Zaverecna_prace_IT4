@@ -6,14 +6,13 @@
 #include <espnow.h>
 #include <common.h>
 #include <db.h>
-//#include <game.h>
-#include <stopwatch.h>
+#include <game.h>
 
 int self_id;
 
 AsyncWebServer server(80);
 AsyncWebSocket ws("/ws");
-Game game(10);
+Game game;
 
 int light(Button btn) {
   //digitalWrite(pin_LED, btn.state);
@@ -41,7 +40,7 @@ void OnDataRecv(uint8_t * mac, uint8_t *incomingData, uint8_t len) {
   }    
   int index = recvData.id-1;
   button[index].state = recvData.state;
-  button[index].enabled = true;
+  button[index].enabled = ENABLED;
   if (LOG_RECV){
     Serial.println("recv (cmd,resp,state)=("+String(recvData.command)+","+String(recvData.response)+","+String(recvData.state)+")");
   }
@@ -243,6 +242,12 @@ const char index_html[] PROGMEM = R"rawliteral(
   function onLoad(event) {
     initWebSocket();
   }
+  function clearGame() {
+    let el = document.getElementById('game');
+    while (el.lastElementChild) {
+      el.removeChild(game.lastElementChild);
+    }
+  }
 
 setInterval(function readState( ) {
   var xhttp = new XMLHttpRequest();
@@ -276,6 +281,7 @@ function toggleCheckbox(element) {
 }
 
 function initGame(element){
+  clearGame();
   var xhr = new XMLHttpRequest();
   xhr.onreadystatechange = function() {
     if (this.readyState == 4 && this.status == 200) {
@@ -481,18 +487,6 @@ void setup()
   server.on("/init", HTTP_GET, [](AsyncWebServerRequest *request)
   {
     game.handleInit(request);
-    // game.stop();
-    // for(int i = 0; i< button_count; i++){
-    //   button[i].state = LOW;
-    //   button[i].enabled = DISABLED;
-    //   sendData.state = WHO_IS_HERE_STATE;
-    //   sendData.id = button[i].id;
-    //   sendData.value = i;
-    //   sendData.command = CMD_WHO_IS_HERE;
-    //   sendData.response = RESP_I_AM_HERE;
-    //   esp_now_send(button[i].address.bytes, (uint8_t *) &sendData, sizeof(sendData));
-    // }
-    // request->send(200, "text/plain", "OK"); 
   });
 
   server.on("/startGame", HTTP_GET, [](AsyncWebServerRequest *request)

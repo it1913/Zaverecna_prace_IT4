@@ -9,11 +9,10 @@ typedef struct Address DeviceAddress;
 
 //AC:0B:FB:D9:9A:50
 DeviceAddress mac_0 = {0xAC, 0x0B, 0xFB, 0xD9, 0x95, 0x58}; //server
-DeviceAddress mac_1 = {0x68, 0xC6, 0x3A, 0xA4, 0xC9, 0x60};
-DeviceAddress mac_2 = {0xAC, 0x0B, 0xFB, 0xD9, 0x9A, 0x50};
-DeviceAddress mac_3 = {0xAC, 0x0B, 0xFB, 0xDC, 0x91, 0x79};
-DeviceAddress mac_4 = {0xC8, 0xC9, 0xA3, 0x0B, 0xEC, 0xA4};
-DeviceAddress mac_5 = {0xAC, 0x0B, 0xFB, 0xD9, 0xFA, 0x37};
+DeviceAddress mac_1 = {0xAC, 0x0B, 0xFB, 0xD9, 0x9A, 0x50};
+DeviceAddress mac_2 = {0xAC, 0x0B, 0xFB, 0xDC, 0x91, 0x79};
+DeviceAddress mac_3 = {0xC8, 0xC9, 0xA3, 0x0B, 0xEC, 0xA4};
+DeviceAddress mac_4 = {0xAC, 0x0B, 0xFB, 0xD9, 0xFA, 0x37};
 
 DeviceAddress mac_server = mac_0;
 
@@ -52,13 +51,12 @@ const int ENABLED = true;
 const int INACTIVE = false;
 const int ACTIVE = true;
 
-const int button_count = 5;
+const int button_count = 4;
 Button button[button_count] = {
     {1, LOW, mac_1, DISABLED, INACTIVE},
     {2, LOW, mac_2, DISABLED, INACTIVE},
     {3, LOW, mac_3, DISABLED, INACTIVE},
-    {4, LOW, mac_4, DISABLED, INACTIVE},
-    {5, LOW, mac_5, DISABLED, INACTIVE}
+    {4, LOW, mac_4, DISABLED, INACTIVE}
 };
 
 struct Message {
@@ -105,4 +103,37 @@ int check(int code, String name) {
     Serial.println(name + " = " + String(code));
   }
   return code;
+}
+
+void buttons() {
+  Serial.println("*** buttons ***");
+  for(int i=0; i<button_count; i++) {
+      Serial.println(String(button[i].id) + ", " + 
+                     mac2str(button[i].address) + ", " +
+                     String(button[i].enabled));
+  }
+  Serial.println("***");
+}
+
+int randomEnabledButtonIndex(int exceptIndex) {
+  int count = 0;
+  //pocet dostupnych tlacitek (krome exceptIndex)
+  for(int i=0; i<button_count; i++) {
+    if ((i != exceptIndex) && (button[i].enabled)) count++;
+  }
+  if (count) {
+    int nthEnabled = rand() % count;  
+    //vyberu n-te dostupne (krome exceptIndex)
+    for(int i=0; i<button_count; i++) {
+      if ((i != exceptIndex) && (button[i].enabled)) {
+        if (nthEnabled==0) {
+          Serial.println("random index = "+String(i)+" of "+String(count)+" except "+String(exceptIndex));
+          return i;
+        }
+        nthEnabled--;
+      }      
+    }    
+  }
+  Serial.println("none of "+String(count)+" except "+String(exceptIndex));
+  return NO_BUTTON_INDEX;
 }

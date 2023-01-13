@@ -9,40 +9,107 @@ const int POSTDATA_NO_DATA = -1;
 const int POSTDATA_NOT_CONNECTED = -2;
 const int POSTDATA_BAD_SERVER = -3;
 
+//Game.nextSelect
+const int NEXT_SELECT_SEQUENCE = 0;
+const int NEXT_SELECT_RANDOM = 1;
+const int NEXT_SELECT_PIVOT_AND_RANDOM = 2;
+
+const int FIRST_STEP = 1;
+const int FIRST_BUTTON_INDEX = 0;
+
 typedef std::function<void()> ClientCallback;
 
 struct Step
 {
 	int buttonIndex;
 	bool done;
-    uint32_t time;
+    ExerciseTime time;
+    int id() {
+        return buttonIndex == NO_BUTTON_INDEX ? 0 : button[buttonIndex].id;
+    }
+    void set(int AButtonIndex, bool ADone, ExerciseTime ATime ) {
+        buttonIndex = AButtonIndex;
+        done = ADone;
+        time = ATime;  
+    }                      
+
+    void init() {
+        set(NO_BUTTON_INDEX, false, 0);
+    }
+    void setDone(int AButtonIndex, ExerciseTime ATime) {
+        set(AButtonIndex, true, ATime);
+    }                      
 };
 
 typedef struct Step Step;
 
 class Game {
     protected:
-        ExerciseId _exerciseId;
-        SessionId _sessionId;
-        ParticipantId _participantId;
+        //definicni informace
+        ExerciseId _exerciseId;             //identifikator cviceni
+        SessionId _sessionId;               //poradove cislo cviceni
+        ParticipantId _participantId;       //aktualni ucastnik
+        int _stepCount;                     //celkovy pocet kroku
+        bool _sameButtonIsAllowed;          //mohou sousedni kroky pouzit stejne tlacitko?
+        bool _firstButtonIsRandom;          //tlacitko v prvnim kroku je nahodne nebo pevne urcene?
+        bool _startAfterFirstStep;          //mereni casu zacina az po stisku prvniho tlacitka?
+        int _nextSelect;
 
-        String _exerciseList;
-        String _participantList;
+        //data
+        String _exerciseList;               //seznam definovanych cviceni
+        String _participantList;            //seznam ucastniku
 
-        int _state;             //stav hry
-        int _buttonIndex;       //index aktualniho tlacitka        
-        int _prevButtonIndex;   //
-        int _stepCount;         //celkovy pocet kroku
-        int _stepDone;          //pocet splnenych kroku
-        bool _modified;         //od posledniho callbacku doslo ke zmene stavu
-        bool _postData;
-        bool _sameButtonIsAllowed;
-        bool _firstButtonIsRandom;
-        uint32_t _startTime;
-        uint32_t _stopTime;
+        //stavove informace
+        int _state;                         //stav hry
+        int _buttonIndex;                   //index aktualniho tlacitka        
+        int _prevButtonIndex;               //index tlacitka z minuleho kroku
+        int _stepDone;                      //pocet splnenych kroku
+        bool _modified;                     //od posledniho callbacku doslo ke zmene stavu
+        bool _postData;                     //priznak "je potreba ulozit data"
+        ExerciseTime _startTime;
+        ExerciseTime _stopTime;
         Step* _step;
         
         ClientCallback _clientCallback;
+
+        void define(ExerciseId exerciseId, 
+                    bool sameButtonIsAllowed, 
+                    bool firstButtonIsRandom, 
+                    bool startAfterFirstStep,
+                    int nextSelect) {        
+            _exerciseId = exerciseId;
+            _sameButtonIsAllowed = sameButtonIsAllowed;
+            _firstButtonIsRandom = firstButtonIsRandom;
+            _startAfterFirstStep = startAfterFirstStep;
+            _nextSelect = nextSelect;
+        }                        
+
+        void init(SessionId sessionId, 
+                  ParticipantId participantId,
+                  int stepCount,
+                  int state) {        
+            _sessionId = sessionId;
+            _participantId = participantId;            
+            _step = nullptr;
+            setStepCount(stepCount);
+            setState(state);            
+            init();
+        }
+
+        void init() {
+            SendData data;
+            for(int i = 0; i< button_count; i++){
+                button[i].state = LOW;
+                button[i].enabled = DISABLED;
+                data.state = WHO_IS_HERE_STATE;
+                data.id = button[i].id;
+                data.value = i;
+                data.command = CMD_WHO_IS_HERE;
+                data.response = RESP_I_AM_HERE;
+                esp_now_send(button[i].address.bytes, (uint8_t *) &data, sizeof(data));
+                delay(10);
+            }
+        }
 
         int getButtonIndex() {
             return _buttonIndex;
@@ -70,9 +137,7 @@ class Game {
             delete[] _step;
             _step = new Step[_stepCount];
             for (int i = 0; i < _stepCount; i++) {
-                _step[i].buttonIndex = NO_BUTTON_INDEX;
-                _step[i].done = false;
-                _step[i].time = 0;
+                _step[i].init();
             }
         }
 
@@ -87,13 +152,15 @@ class Game {
         }
 
         void incStepDone() {
+            ExerciseTime now = millis(); 
             int index = _stepDone;
-            _stepDone++;
+            _stepDone++;            
+            if ((_stepDone==FIRST_STEP) && getStartAfterFirstStep()) {
+                _startTime = now;
+            }
             setModified(true);
             _prevButtonIndex = _buttonIndex;
-            _step[index].buttonIndex = _buttonIndex;
-            _step[index].done = true;
-            _step[index].time = millis() - _startTime;            
+            _step[index].setDone(_buttonIndex, now - _startTime);
             Serial.println("Step #"+String(_stepDone)+" done in "+stopwatch(_step[index].time)+" s"); 
             setButtonIndex(NO_BUTTON_INDEX);
             if (isOver() || _stepDone) clientCallback();
@@ -147,11 +214,24 @@ class Game {
             }            
         }
 
-        bool getFirstButoonIsRandom () {
+        bool getFirstButonIsRandom () {
             return _firstButtonIsRandom;
         }
 
+        bool getStartAfterFirstStep () {
+            return _startAfterFirstStep;
+        }
+
+        bool isRandomSelection() {
+            return (_nextSelect == NEXT_SELECT_RANDOM);
+        }
+
+        bool isPivotAndRandomSelection() {
+            return (_nextSelect == NEXT_SELECT_PIVOT_AND_RANDOM);
+        } 
+
         bool isValidButtonIndex(int index) {
+            delay(10);
             return ((index>=0) && 
                     (index<button_count) && 
                     (button[index].enabled) && 
@@ -165,23 +245,40 @@ class Game {
 
         int nextButtonIndex() {
             int index;
-            if (!getFirstButoonIsRandom() && (getStepDone() == 0)) {
-                index = 0;
+            if (!getFirstButonIsRandom() && (getStepDone() == 0)) {
+                Serial.println("first");
+                index = FIRST_BUTTON_INDEX;
+            } else 
+            if (isRandomSelection()) {
+               index = randomEnabledButtonIndex(_prevButtonIndex);
+            } else 
+            if (isPivotAndRandomSelection()) {
+                if (_prevButtonIndex == FIRST_BUTTON_INDEX) {
+                    index = randomEnabledButtonIndex(FIRST_BUTTON_INDEX);
+                } else {
+                    index = FIRST_BUTTON_INDEX;
+                }
             } else {
-                index = rand() % button_count;
+                bool over = false;
+                index = _prevButtonIndex; 
+                do {
+                    index = index+1 < button_count ? index+1 : FIRST_BUTTON_INDEX;
+                    over = isValidButtonIndex(index) || (index == _prevButtonIndex); 
+                } while (!over);
             };
             if (isValidButtonIndex(index)) return index;
             int i;
-            i = index-1;
-            while (i>=0) {
-                if (isValidButtonIndex(i)) return i;
-                i--;
-            };
             i = index+1;
             while (i<button_count) {
                 if (isValidButtonIndex(i)) return i;
                 i++;
             };
+            i = index-1;
+            while (i>=0) {
+                if (isValidButtonIndex(i)) return i;
+                i--;
+            };
+            Serial.println("no next button index");
             return NO_BUTTON_INDEX;
         }
 
@@ -229,24 +326,37 @@ class Game {
             return "";
         }
 
-        Game(int AStepCount) { 
-            _sameButtonIsAllowed = false;
-            _firstButtonIsRandom = false;
-            _step = nullptr;
-            setStepCount(AStepCount);
-            setState(STATE_OFF);            
+        Game() { 
+            define("", false, false, false, NEXT_SELECT_SEQUENCE);
+            init(0, "", 0, STATE_OFF);
         } 
+
         ~Game() {
             delete[] _step;
-        }        
+        }  
 
-        void start(ExerciseId exerciseId, SessionId sessionId, ParticipantId participantId, int AStepCount) {
+        void start(ExerciseId exerciseId, SessionId sessionId, ParticipantId participantId, int stepCount) {
             if (isActive()) { return; } 
-            _exerciseId = exerciseId;
-            _sessionId = sessionId;
-            _participantId = participantId;
-            setStepCount(AStepCount);
-            setState(STATE_ON);
+            Serial.println("start");
+            define(exerciseId, false, false, false, NEXT_SELECT_PIVOT_AND_RANDOM);
+            init(sessionId, participantId, stepCount, STATE_ON);
+        }
+
+        void me_(String name) {
+            Serial.println("*** name="+name+" ***"); 
+            Serial.println("exerciseId="+_exerciseId);
+            Serial.println("sessionId="+String(_sessionId));
+            Serial.println("participantId="+_participantId);
+            Serial.println("stepCount="+String(_stepCount));
+            Serial.println("state="+String(_state));
+            Serial.println("buttonIndex="+String(_buttonIndex));
+            Serial.println("prevButtonIndex="+String(_prevButtonIndex));
+            Serial.println("stepDone="+String(_stepDone));
+            Serial.println("sameButtonIsAllowed="+String(_sameButtonIsAllowed));
+            Serial.println("firstButtonIsRandom="+String(_firstButtonIsRandom));
+            Serial.println("startAfterFirstStep="+String(_startAfterFirstStep));
+            Serial.println("nextSelect="+String(_nextSelect));
+            buttons();
         }
 
         void stop() {
@@ -254,25 +364,7 @@ class Game {
             setState(STATE_OFF);   
         }
 
-        void init(ExerciseId exerciseId, SessionId sessionId, ParticipantId participantId) {
-            _exerciseId = exerciseId;
-            _sessionId = sessionId;
-            _participantId = participantId;
-            init();
-        }
-
-        void init() {
-            SendData data;
-            for(int i = 0; i< button_count; i++){
-                button[i].state = LOW;
-                button[i].enabled = DISABLED;
-                data.state = WHO_IS_HERE_STATE;
-                data.id = button[i].id;
-                data.value = i;
-                data.command = CMD_WHO_IS_HERE;
-                data.response = RESP_I_AM_HERE;
-                esp_now_send(button[i].address.bytes, (uint8_t *) &data, sizeof(data));
-            }
+        void stopWatch() {
         }
 
         void loop() {
@@ -325,7 +417,7 @@ class Game {
 
         void handleInit(AsyncWebServerRequest *request){
             stop();
-            init();
+            init();   
             request->send(200, "text/plain", "OK");
         }
 
@@ -409,10 +501,10 @@ class Game {
                     httpResponseCode = http.POST(httpRequestData);
                     
                     if (httpResponseCode>0) {
-                    Serial.print("HTTP Response code: ");
-                    Serial.println(httpResponseCode);
-                    String payload = http.getString();
-                    Serial.println(payload);
+                    // Serial.print("HTTP Response code: ");
+                    // Serial.println(httpResponseCode);
+                    // String payload = http.getString();
+                    // Serial.println(payload);
                     }
                     else {
                     Serial.print("Error code: ");
@@ -465,18 +557,22 @@ class Game {
         }
 
         String stepData(int step) {
+            String b = "";
             String s;
             String t = "";
             if ((step < getStepDone()) || isOver()) {
                 s = "done";
-                if (_step[step].done) t = " in " + stopwatch(_step[step].time)+" s";
+                if (_step[step].done) {
+                    t = " in " + stopwatch(_step[step].time)+" s";
+                    b = " on #" + String(_step[step].id());                      
+                }
             } else
             if (step > getStepDone()) {
                 s = "waiting";
             } else {
                 s = "current";
             };
-            s = "<div class=\"data "+s+"\">Step #" + String(step+1) + " is " + s + t + "</div>";
+            s = "<div class=\"data "+s+"\">Step #" + String(step+1) + b + " is " + s + t + "</div>";
             return s;
         }
 
