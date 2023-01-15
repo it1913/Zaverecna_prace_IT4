@@ -25,6 +25,8 @@ struct Button
   bool playing; //tlacitko reagovalo na zpravu CMD_I_WILL_PLAY odpovedi RESP_I_WILL_PLAY
 };
 
+const String LIGHTCONE_URL = "http://www.kavala.cz/martin/lightcone/";
+
 const int CLIENT_PRESS_DELAY = 300;
 const int NO_BUTTON_INDEX = -1;
 const int WHO_IS_HERE_STATE = LOW;
@@ -93,8 +95,8 @@ String time2str(uint32_t millis) {
 String stopwatch(uint32_t millis) {
   int secs = millis/1000;
   int msec = millis%1000;
-  char s[10];
-  sprintf(s,"%01d.%01d",secs,msec/100);
+  char s[11];
+  sprintf(s,"%01d.%02d",secs,msec/10);
   return s;
 }
 

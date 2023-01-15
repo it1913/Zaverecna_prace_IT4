@@ -122,90 +122,66 @@ const char index_html[] PROGMEM = R"rawliteral(
   <title>%TITLE%</title>
   <meta http-equiv="content-type" content="text/html; charset=UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="stylesheet" href="%LIGHTCONE_URL%lightcone.css">
   <style>
-    html {font-family: Segoe UI; display: inline-block; text-align: center;}
-    h2 {font-size: 1.5rem;}
-    h4 {font-size: 1.0rem;}
-    p {font-size: 1.0rem;}
-    body {max-width: 900px; margin:0px auto; padding-bottom: 25px;}
-    .switch {position: relative; display: inline-block; width: 120px; height: 68px} 
-    .switch input {display: none}
-    .slider {position: absolute; top: 0; left: 0; right: 0; bottom: 0; background-color: #FF0000; border-radius: 34px}
-    .slider:before {position: absolute; content: ""; height: 52px; width: 52px; left: 8px; bottom: 8px; background-color: #fff; -webkit-transition: .4s; transition: .4s; border-radius: 68px}    
-    input:checked+.slider {background-color: #27c437}
-    input:disabled+.slider {background-color: gray}    
-    input:checked+.slider:before {-webkit-transform: translateX(52px); -ms-transform: translateX(52px); transform: translateX(52px)}
-    .row { display: flex; }
-    .column { flex: 50vw; }
-    button { 
-      width: 30vw; 
-      margin: 5px; 
-      background-color: #4CAF50; /* Green */
-      border: none;
-      color: white;
-      padding: 15px 32px;
-      text-align: center;
-      text-decoration: none;
-      display: inline-block;
-      font-size: 16px;
-    }
-    .data { width: 30vw; padding: 5px; margin: 5px; background-color: LightSkyBlue; }
-    .header { font-weight: bold; background-color: DodgerBlue; }
-    .current { font-weight: bold; background-color: Gold; }
-    .done { background-color: LightGrey; }
-    .waiting { }
-    #timewatch { font-size: 2em; }
   </style>
 </head>
 <body>
-  <h2>%TITLE%</h2>
-  <div class="row">
-    <div class="column">
-%BUTTON%
-      <div><button type="button" onclick="initGame()">INIT</button></div>
-      <div><button type="button" onclick="startGame()">START</button></div>
-      <div><button type="button" onclick="stopGame()">STOP</button></div>
-      <div>
-        <div><label for="exerciseId">Choose a exercise:</label></div>
-        <div>
-          <select id="exerciseId">
-            %EXERCISE%
-          </select>
-        </div>
-      </div>
-      <div>
-        <div><label for="sessionId">Session:</label></div>
-        <div>
-          <input type="number" id="sessionId" value="0">
-        </div>
-      </div>
-      <div>
-        <div><label for="stepCount">Step count:</label></div>
-        <div>
-          <input type="number" id="stepCount" min="1" max="100" value="10">
-        </div>
-      </div>
-      <div>
-        <div><label for="participantId">Choose a player:</label></div>
-        <div>
-          <select id="participantId">
-            %PARTICIPANT%
-          </select>      
-        </div>
-      </div>
-    </div>
-    <div class="column" id="game">
-%GAMEDATA%    
+  <div class="navbar">
+    <div class="row">
+        <div class="column"><button type="button" onclick="initGame()" class="init">INIT</button></div>
+        <div class="column"><button type="button" onclick="startGame()" class="start">START</button></div>
+        <div class="column"><button type="button" onclick="stopGame()" class="stop">STOP</button></div>
     </div>
   </div>
+  <div class="main">
+    <div class="row">
+      <div class="column">
+  %BUTTON%
+        <div class="participantId">
+          <div><label for="participantId">Hráč:</label></div>
+          <div>
+            <select id="participantId">
+              %PARTICIPANT%
+            </select>      
+          </div>
+        </div>
+        <div class="exerciseId">
+          <div><label for="exerciseId">Cvičení:</label></div>
+          <div>
+            <select id="exerciseId">
+              %EXERCISE%
+            </select>
+          </div>
+        </div>
+        <div class="stepCount">
+          <div><label for="stepCount">Počet kroků:</label></div>
+          <div>
+            <input type="number" id="stepCount" min="1" max="100" value="10">
+          </div>
+        </div>
+        <div class="sessionId">
+          <div><label for="sessionId">Session:</label></div>
+          <div>
+            <input type="number" id="sessionId" value="0">
+          </div>
+        </div>
+      </div>
+      <div class="column" id="game">
+  %GAMEDATA%    
+      </div>
+    </div>
+  </div> 
 <script>
-  let startAudio = new Audio("http://www.kavala.cz/martin/lightcone/start.mp3");
+  let initAudio = new Audio("%LIGHTCONE_URL%init.mp3");
+  initAudio.preload="auto";
+  let startAudio = new Audio("%LIGHTCONE_URL%start.mp3");
   startAudio.preload="auto";
-  let stepAudio = new Audio("http://www.kavala.cz/martin/lightcone/step.mp3");
+  let stepAudio = new Audio("%LIGHTCONE_URL%step.mp3");
   stepAudio.preload="auto";
-  let overAudio = new Audio("http://www.kavala.cz/martin/lightcone/over.mp3");
+  let overAudio = new Audio("%LIGHTCONE_URL%over.mp3");
   overAudio.preload="auto";
-  let stopAudio = new Audio("http://www.kavala.cz/martin/lightcone/stop.mp3");
+  let stopAudio = new Audio("%LIGHTCONE_URL%stop.mp3");
   stopAudio.preload="auto";
 
 
@@ -299,6 +275,7 @@ function initGame(element){
   };
   xhr.open("GET", "/init", true);
   xhr.send();
+  playSound(initAudio, 0.3);
 }
 
 function startGame(element){ 
@@ -371,10 +348,13 @@ String processor(const String &var)
       String id_output = "output" + String(button[i].id);
       String disabled = "";
       if (!button[i].enabled) { disabled = " disabled"; };
-      buttons += "  <div><h4>Button #" + String(button[i].id) + ": <span id=\"" + id_outputState + "\"></span></h4>\n" +
-                 "  <label class=\"switch\"><input type=\"checkbox\" onchange=\"toggleCheckbox(this)\" id=\"" + id_output + "\" " + outputStateValue + disabled + "><span class=\"slider\"></span></label></div>";
+      //buttons += "  <div><h4>Button #" + String(button[i].id) + ": <span id=\"" + id_outputState + "\"></span></h4>\n" +
+      buttons += "  <div><span class=\"switchId\">#" + String(button[i].id) + "</span><label class=\"switch\"><input type=\"checkbox\" onchange=\"toggleCheckbox(this)\" id=\"" + id_output + "\" " + outputStateValue + disabled + "><span class=\"slider\"></span></label></div>";
     }
     return buttons;
+  } else
+  if (var == "LIGHTCONE_URL") {
+    return LIGHTCONE_URL;
   } else
   if (var == "GAMEDATA") {
     return game.data();

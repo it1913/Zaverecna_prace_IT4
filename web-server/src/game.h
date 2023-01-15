@@ -473,8 +473,7 @@ class Game {
 
         int internalPostData(String data) {
             //Tento callback se vola pri pozadavku na ulozeni dat do uloziste
-            const String SERVER_NAME = "http://www.kavala.cz/martin/";
-            // const String POST_URL = "button.php";
+            const String SERVER_NAME = LIGHTCONE_URL;
             const String PATH = "api?"+data;
 
             //Check WiFi connection status

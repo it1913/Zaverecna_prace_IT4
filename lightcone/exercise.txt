@@ -1,0 +1,4 @@
+<option value="1">Stopky</option>
+<option value="2">Člunkový běh</option>
+<option value="3">Vějíř</option>
+<option value="4">Postřeh</option>
