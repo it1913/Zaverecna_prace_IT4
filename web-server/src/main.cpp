@@ -235,7 +235,6 @@ const char index_html[] PROGMEM = R"rawliteral(
     let el = document.getElementById('game');
     if (el) {
       el.innerHTML = event.data;
-      playSound(stepAudio, 0.3);
       let isOver = event.data.includes("dokončené");
       if (isOver) playSound(overAudio, 0.3);
     }
