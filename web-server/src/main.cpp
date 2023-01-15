@@ -184,7 +184,7 @@ const char index_html[] PROGMEM = R"rawliteral(
       </div>
       <div class="col-sm-4">
         <h3>Stav tlačítek</h3>
-        <div class="btn-group-vertical">
+        <div class="btn-group-vertical" id="buttons">
           %BUTTON%
         </div>    
       </div>
@@ -249,14 +249,11 @@ setInterval(function readState( ) {
   xhttp.onreadystatechange = function() {
     if (this.readyState == 4 && this.status == 200) {
       const state = this.responseText.split(',').map(Number);
-      const elements = document.querySelectorAll('input');      
+      const buttons = document.getElementById("buttons");
+      const elements = buttons.querySelectorAll('input');      
       elements.forEach((el, index) => { 
         el.checked = Boolean(state[index] & 1); 
         el.disabled = Boolean(state[index] & 2);
-        os = document.getElementById("outputState"+(index+1));
-        if (os) {
-          os.innerHTML = (el.checked ? "ON" : "OFF" );
-        };  
       });
     }
   };
@@ -281,14 +278,11 @@ function initGame(element){
   xhr.onreadystatechange = function() {
     if (this.readyState == 4 && this.status == 200) {
       const state = this.responseText.split(',').map(Number);
-      const elements = document.querySelectorAll('input');      
+      const buttons = document.getElementById("buttons");
+      const elements = buttons.querySelectorAll('input');      
       elements.forEach((el, index) => { 
         el.checked = Boolean(state[index] & 1); 
         el.disabled = Boolean(state[index] & 2);
-        os = document.getElementById("outputState"+(index+1));
-        if (os) {
-          os.innerHTML = (el.checked ? "ON" : "OFF" );
-        };  
       });
     }
   };
@@ -331,7 +325,7 @@ function stopGame(element){
 String checkBox(Button button) {
   String checked = (button.state == HIGH ? " checked" : "");
   String id = String(button.id);
-  String checkboxId = "output" + id;
+  String checkboxId = "cb" + id;
   String disabled = (button.enabled ? "" : " disabled");
   String s = "<div class=\"form-check form-switch\">";
   return s +
@@ -360,13 +354,6 @@ String processor(const String &var)
     String buttons = "";
     for (int i = 0; i < button_count; i++)
     {
-      // String outputStateValue = outputState(button[i]);
-      // String id_outputState = "outputState" + String(button[i].id);
-      // String id_output = "output" + String(button[i].id);
-      // String disabled = "";
-      // if (!button[i].enabled) { disabled = " disabled"; };
-      // //buttons += "  <div><h4>Button #" + String(button[i].id) + ": <span id=\"" + id_outputState + "\"></span></h4>\n" +
-      // buttons += "  <div><span class=\"switchId\">#" + String(button[i].id) + "</span><label class=\"switch\"><input type=\"checkbox\" onchange=\"toggleCheckbox(this)\" id=\"" + id_output + "\" " + outputStateValue + disabled + "><span class=\"slider\"></span></label></div>";
       buttons += checkBox(button[i]);
     }
     return buttons;
@@ -448,7 +435,7 @@ void setup()
         input_state = request->getParam(parameter_state)->value();
         input_id = request->getParam(parameter_id)->value();
         for (int i=0; i< button_count;  i++) {
-          if ("output"+String(button[i].id) == input_id) {
+          if ("cb"+String(button[i].id) == input_id) {
             button[i].state = input_state.toInt();
             sendData.state = button[i].state;
             sendData.id = button[i].id;

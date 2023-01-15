@@ -601,7 +601,7 @@ class Game {
         String data() {
                 return "<ul class=\"list-group\"><li class=\"list-group-item list-group-item-primary\">Cvičení je " + stateText() + "<br>" +
                 String(_stepDone) + " z " + String(_stepCount) + "<br>" +
-                "<span id=\"timewatch\">" + getTimeText() + "</span><br>" +
+                "<span id=\"timewatch\">" + getTimeText() + " s</span><br>" +
                 "</li>" + stepsData() + "</ul>";
         }
 
