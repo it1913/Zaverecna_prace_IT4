@@ -117,61 +117,80 @@ void initMDNS(String name) {
 }
 
 const char index_html[] PROGMEM = R"rawliteral(
-<!DOCTYPE HTML><html>
+<!DOCTYPE html>
+<html lang="cz">
 <head>
-  <title>%TITLE%</title>
-  <meta http-equiv="content-type" content="text/html; charset=UTF-8">
+  <title>%TILE%</title>
+  <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <link rel="stylesheet" href="%LIGHTCONE_URL%lightcone.css">
-  <style>
-  </style>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/js/bootstrap.bundle.min.js"></script>
 </head>
 <body>
-  <div class="navbar">
+  <div class="container-sm mt-5">
+    <div class="mt-4 p-5 bg-primary text-white rounded">
+      <h1>%TITLE%</h1>
+      <p>Stiskni a běž!</p>
+      <div class="row">
+        <div class="col-sm-12">
+          <button type="button" class="btn btn-warning btn-lg" onclick="initGame()">Připravit</button>
+          <button type="button" class="btn btn-success btn-lg" onclick="startGame()">Start</button>
+          <button type="button" class="btn btn-danger btn-lg" onclick="stopGame()" >Stop</button>
+        </div>
+      </div>  
+    </div>  
+  </div>
+    
+  <div class="container-sm mt-5">
+    <h3>Parametry</h3>  
+    <form>      
+      <div class="row">          
+        <div class="col-sm-6">
+          <div class="input-group input-group-lg">
+            <span class="input-group-text">Hráč</span>
+            <select class="form-select" id="participantId">
+              <option value="1">Adam</option>
+              <option value="2">Břetislav</option>
+              <option value="3">Cyril</option>
+            </select>
+            <input type="number" class="form-control" placeholder="Session" id="sessionId" min="1" value="1" disabled>
+          </div>
+        </div>
+        <div class="col-sm-6">
+          <div class="input-group input-group-lg">
+            <span class="input-group-text">Cvičení</span>
+            <select class="form-select" id="exerciseId">
+              <option value="1">Stopky</option>
+              <option value="2">Člunkový běh</option>
+              <option value="3">Vějíř</option>
+              <option value="4" selected>Postřeh</option>
+            </select>
+            <input type="number" class="form-control" placeholder="Počet kroků" id="stepCount" min="1" max="100" value="10">
+          </div>
+        </div>
+      </div>
+    </form>            
+  </div>
+
+  <div class="container-sm mt-5">
     <div class="row">
-        <div class="column"><button type="button" onclick="initGame()" class="init">INIT</button></div>
-        <div class="column"><button type="button" onclick="startGame()" class="start">START</button></div>
-        <div class="column"><button type="button" onclick="stopGame()" class="stop">STOP</button></div>
+      <div class="col-sm-8">
+        <h3>Výsledky</h3>
+        <div id="game">
+          <ul class="list-group">
+            %GAMEDATA%
+          </ul>        
+        </div>
+      </div>
+      <div class="col-sm-4">
+        <h3>Stav tlačítek</h3>
+        <div class="btn-group-vertical">
+          %BUTTON%
+        </div>    
+      </div>
     </div>
   </div>
-  <div class="main">
-    <div class="row">
-      <div class="column">
-  %BUTTON%
-        <div class="participantId">
-          <div><label for="participantId">Hráč:</label></div>
-          <div>
-            <select id="participantId">
-              %PARTICIPANT%
-            </select>      
-          </div>
-        </div>
-        <div class="exerciseId">
-          <div><label for="exerciseId">Cvičení:</label></div>
-          <div>
-            <select id="exerciseId">
-              %EXERCISE%
-            </select>
-          </div>
-        </div>
-        <div class="stepCount">
-          <div><label for="stepCount">Počet kroků:</label></div>
-          <div>
-            <input type="number" id="stepCount" min="1" max="100" value="10">
-          </div>
-        </div>
-        <div class="sessionId">
-          <div><label for="sessionId">Session:</label></div>
-          <div>
-            <input type="number" id="sessionId" value="0">
-          </div>
-        </div>
-      </div>
-      <div class="column" id="game">
-  %GAMEDATA%    
-      </div>
-    </div>
-  </div> 
+
 <script>
   let initAudio = new Audio("%LIGHTCONE_URL%init.mp3");
   initAudio.preload="auto";
@@ -309,18 +328,16 @@ function stopGame(element){
 </html>
 )rawliteral";
 
-String outputState(Button button)
-{
-  //if (digitalRead(output))
-  if (button.state == HIGH)
-  {
-    return "checked";
-  }
-  else
-  {
-    return "";
-  }
-  return "";
+String checkBox(Button button) {
+  String checked = (button.state == HIGH ? " checked" : "");
+  String id = String(button.id);
+  String checkboxId = "output" + id;
+  String disabled = (button.enabled ? "" : " disabled");
+  String s = "<div class=\"form-check form-switch\">";
+  return s +
+         "<input class=\"form-check-input\" type=\"checkbox\" id=\"" + checkboxId + "\" onchange=\"toggleCheckbox(this)\"" + checked + disabled + ">" +
+         "<label class=\"form-check-label\" for=\"" + checkboxId + "\">Tlačítko #" + id +"</label>" +
+         "</div>";
 }
 
 int32_t getWiFiChannel(const char *ssid) {
@@ -337,19 +354,20 @@ int32_t getWiFiChannel(const char *ssid) {
 String processor(const String &var)
 {
   if (var == "TITLE") {
-    return "LightCone";
+    return "LightCone: Velká modrá tlačítka";
   } else
   if (var == "BUTTON") {
     String buttons = "";
     for (int i = 0; i < button_count; i++)
     {
-      String outputStateValue = outputState(button[i]);
-      String id_outputState = "outputState" + String(button[i].id);
-      String id_output = "output" + String(button[i].id);
-      String disabled = "";
-      if (!button[i].enabled) { disabled = " disabled"; };
-      //buttons += "  <div><h4>Button #" + String(button[i].id) + ": <span id=\"" + id_outputState + "\"></span></h4>\n" +
-      buttons += "  <div><span class=\"switchId\">#" + String(button[i].id) + "</span><label class=\"switch\"><input type=\"checkbox\" onchange=\"toggleCheckbox(this)\" id=\"" + id_output + "\" " + outputStateValue + disabled + "><span class=\"slider\"></span></label></div>";
+      // String outputStateValue = outputState(button[i]);
+      // String id_outputState = "outputState" + String(button[i].id);
+      // String id_output = "output" + String(button[i].id);
+      // String disabled = "";
+      // if (!button[i].enabled) { disabled = " disabled"; };
+      // //buttons += "  <div><h4>Button #" + String(button[i].id) + ": <span id=\"" + id_outputState + "\"></span></h4>\n" +
+      // buttons += "  <div><span class=\"switchId\">#" + String(button[i].id) + "</span><label class=\"switch\"><input type=\"checkbox\" onchange=\"toggleCheckbox(this)\" id=\"" + id_output + "\" " + outputStateValue + disabled + "><span class=\"slider\"></span></label></div>";
+      buttons += checkBox(button[i]);
     }
     return buttons;
   } else

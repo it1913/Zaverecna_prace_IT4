@@ -201,13 +201,13 @@ class Game {
         String stateText() {
             switch(getState()) {
                 case STATE_OFF:
-                    return "OFF";
+                    return "vypnuté";
                     break;
                 case STATE_ON:
-                    return "ON";
+                    return "aktivní";
                     break;
                 case STATE_OVER:
-                    return "OVER";
+                    return "dokončené";
                     break;
                 default:
                     return "UNKNOWN";
@@ -558,20 +558,24 @@ class Game {
         String stepData(int step) {
             String b = "";
             String s;
+            String c;
             String t = "";
             if ((step < getStepDone()) || isOver()) {
-                s = "done";
+                s = "dokončen";
+                c = "list-group-item-success";
                 if (_step[step].done) {
-                    t = " in " + stopwatch(_step[step].time)+" s";
-                    b = " on #" + String(_step[step].id());                      
+                    t = " za " + stopwatch(_step[step].time)+" s";
+                    b = " na #" + String(_step[step].id());                      
                 }
             } else
             if (step > getStepDone()) {
-                s = "waiting";
+                s = "připraven";
+                c = "list-group-item-warning";
             } else {
-                s = "current";
+                s = "aktivní";
+                c = "active";
             };
-            s = "<div class=\"data "+s+"\">Step #" + String(step+1) + b + " is " + s + t + "</div>";
+            s = "<li class=\"list-group-item "+c+"\">Krok #" + String(step+1) + b + " je " + s + t + "</li>";
             return s;
         }
 
@@ -584,11 +588,21 @@ class Game {
             return s;
         }
 
+        String progressBar() {
+            String s = String(_stepDone) + " z " + String(_stepCount);
+            return 
+                "<div class=\"container p-1 my-1\">"
+                "  <div class=\"progress\" style=\"height:30px\">"
+                "    <div class=\"progress-bar bg-success\" style=\"width:1%;height:30px\">" + s + "</div>"
+                "  </div>"
+                "</div>";
+        }
+
         String data() {
-            return "<div class=\"data header\">GAME IS " + stateText() + "<br>" +
-                String(_stepDone) + " of " + String(_stepCount) + "<br>" +
+                return "<ul class=\"list-group\"><li class=\"list-group-item list-group-item-primary\">Cvičení je " + stateText() + "<br>" +
+                String(_stepDone) + " z " + String(_stepCount) + "<br>" +
                 "<span id=\"timewatch\">" + getTimeText() + "</span><br>" +
-                "</div>" + stepsData();
+                "</li>" + stepsData() + "</ul>";
         }
 
         String getDataList(String name) {
