@@ -93,10 +93,10 @@ class Game {
             _step = nullptr;
             setStepCount(stepCount);
             setState(state);            
-            init();
+            initButtons();
         }
 
-        void init() {
+        void initButtons() {
             SendData data;
             for(int i = 0; i< button_count; i++){
                 button[i].state = LOW;
@@ -327,8 +327,8 @@ class Game {
         }
 
         Game() { 
-            define("", false, false, false, NEXT_SELECT_SEQUENCE);
-            init(0, "", 0, STATE_OFF);
+            define(0, false, false, false, NEXT_SELECT_SEQUENCE);
+            init(0, 0, 0, STATE_OFF);
         } 
 
         ~Game() {
@@ -338,8 +338,33 @@ class Game {
         void start(ExerciseId exerciseId, SessionId sessionId, ParticipantId participantId, int stepCount) {
             if (isActive()) { return; } 
             Serial.println("start");
-            define(exerciseId, false, false, false, NEXT_SELECT_PIVOT_AND_RANDOM);
+            switch (exerciseId) {
+                case EXERCISE_STOPWATCH1:
+                    //
+                    define(exerciseId, false, false, false, NEXT_SELECT_SEQUENCE);
+                    stepCount = 1;
+                    break;
+                case EXERCISE_STOPWATCH2:
+                    //
+                    define(exerciseId, false, false, true, NEXT_SELECT_SEQUENCE);
+                    stepCount = 2;
+                    break;
+                case EXERCISE_SHUTTLERUN:
+                    //
+                    define(exerciseId, false, false, true, NEXT_SELECT_SEQUENCE);
+                    break;
+                case EXERCISE_FAN:
+                    //
+                    define(exerciseId, false, false, true, NEXT_SELECT_PIVOT_AND_RANDOM);
+                    break;
+                case EXERCISE_REACTION:
+                    //               
+                    define(exerciseId, false, true, false, NEXT_SELECT_RANDOM);
+                    break;
+            };
+            Serial.println("hra=" + String(_exerciseId));
             init(sessionId, participantId, stepCount, STATE_ON);
+            me_("start after switch");
         }
 
         void me_(String name) {
@@ -402,22 +427,22 @@ class Game {
         }
 
         void handleStart(AsyncWebServerRequest *request){
-            start(strParam(request, "exerciseId", _exerciseId),
+            start(intParam(request, "exerciseId", _exerciseId),
                   intParam(request, "sessionId", _sessionId),
-                  strParam(request, "participantId", _participantId),                
+                  intParam(request, "participantId", _participantId),                
                   intParam(request, "stepCount", 10));
             request->send(200, "text/plain", "OK");
         }
 
         void handleStop(AsyncWebServerRequest *request){
             stop();
-            init();            
+            initButtons();            
             request->send(200, "text/plain", "OK");
         }
 
         void handleInit(AsyncWebServerRequest *request){
             stop();
-            init();   
+            initButtons();   
             request->send(200, "text/plain", "OK");
         }
 
@@ -500,14 +525,14 @@ class Game {
                     httpResponseCode = http.POST(httpRequestData);
                     
                     if (httpResponseCode>0) {
-                    // Serial.print("HTTP Response code: ");
-                    // Serial.println(httpResponseCode);
-                    // String payload = http.getString();
-                    // Serial.println(payload);
+                        // Serial.print("HTTP Response code: ");
+                        // Serial.println(httpResponseCode);
+                        // String payload = http.getString();
+                        // Serial.println(payload);
                     }
                     else {
-                    Serial.print("Error code: ");
-                    Serial.println(httpResponseCode);
+                        Serial.print("Error code: ");
+                        Serial.println(httpResponseCode);
                     }
                 } else {        
                     httpResponseCode = POSTDATA_BAD_SERVER;
@@ -599,14 +624,19 @@ class Game {
         }
 
         String data() {
-                return "<ul class=\"list-group\"><li class=\"list-group-item list-group-item-primary\">Cvičení je " + stateText() + "<br>" +
-                String(_stepDone) + " z " + String(_stepCount) + "<br>" +
-                "<span id=\"timewatch\">" + getTimeText() + " s</span><br>" +
-                "</li>" + stepsData() + "</ul>";
+            String s = "Cvičení je " + stateText();
+            if (!isOff()) {
+                s += "<br>Krok: " + String(_stepDone) + " z " + String(_stepCount) + "<br>" +
+                     "<span id=\"timewatch\">Čas: " + getTimeText() + " s</span>";
+            }
+            return "<ul class=\"list-group\">"
+                   "<li class=\"list-group-item list-group-item-primary\">" + s + "</li>" +
+                   stepsData() +
+                   "</ul>";
         }
 
         String getDataList(String name) {
-            String url = "http://www.kavala.cz/martin/";
+            String url = LIGHTCONE_URL;
             return GET(url+name);
         }
 

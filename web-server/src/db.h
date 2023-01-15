@@ -1,6 +1,7 @@
-typedef String ExerciseId;
+typedef String Abbr;
+typedef int ExerciseId;
 typedef int SessionId;
-typedef String ParticipantId;
+typedef int ParticipantId;
 typedef uint32_t ExerciseTime;
 
 class Record {
@@ -29,7 +30,7 @@ class Record {
 
         String data() {
             return
-            "exerciseId="+_exerciseId+
+            "exerciseId="+String(_exerciseId)+
             "&sessionId="+_sessionId+
             "&participantId="+_participantId+
             "&step="+String(_step)+

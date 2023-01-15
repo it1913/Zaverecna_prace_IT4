@@ -53,6 +53,12 @@ const int ENABLED = true;
 const int INACTIVE = false;
 const int ACTIVE = true;
 
+const int EXERCISE_STOPWATCH1 = 1;
+const int EXERCISE_STOPWATCH2 = 2;
+const int EXERCISE_SHUTTLERUN = 3;
+const int EXERCISE_FAN = 4;
+const int EXERCISE_REACTION = 5;
+
 const int button_count = 4;
 Button button[button_count] = {
     {1, LOW, mac_1, DISABLED, INACTIVE},

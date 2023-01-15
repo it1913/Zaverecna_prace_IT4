@@ -125,6 +125,9 @@ const char index_html[] PROGMEM = R"rawliteral(
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/css/bootstrap.min.css" rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/js/bootstrap.bundle.min.js"></script>
+  <style>
+    #timewatch { font-weight: bold; font-size: 2em; }
+  </style>
 </head>
 <body>
   <div class="container-sm mt-5">
@@ -160,10 +163,11 @@ const char index_html[] PROGMEM = R"rawliteral(
           <div class="input-group input-group-lg">
             <span class="input-group-text">Cvičení</span>
             <select class="form-select" id="exerciseId">
-              <option value="1">Stopky</option>
-              <option value="2">Člunkový běh</option>
-              <option value="3">Vějíř</option>
-              <option value="4" selected>Postřeh</option>
+              <option value="1">Stopky 1</option>
+              <option value="2">Stopky 2</option>
+              <option value="3">Člunkový běh</option>
+              <option value="4">Vějíř</option>
+              <option value="5" selected>Postřeh</option>
             </select>
             <input type="number" class="form-control" placeholder="Počet kroků" id="stepCount" min="1" max="100" value="10">
           </div>
@@ -232,6 +236,8 @@ const char index_html[] PROGMEM = R"rawliteral(
     if (el) {
       el.innerHTML = event.data;
       playSound(stepAudio, 0.3);
+      let isOver = event.data.includes("dokončené");
+      if (isOver) playSound(overAudio, 0.3);
     }
   }        
   function onLoad(event) {
@@ -348,7 +354,7 @@ int32_t getWiFiChannel(const char *ssid) {
 String processor(const String &var)
 {
   if (var == "TITLE") {
-    return "LightCone: Velká modrá tlačítka";
+    return "Velká modrá tlačítka";
   } else
   if (var == "BUTTON") {
     String buttons = "";
